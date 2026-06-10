@@ -94,7 +94,7 @@ def to_match_summary(fixture: PredictionFixture) -> MatchSummary:
 
 
 def _load_live_fixtures() -> list[PredictionFixture]:
-    snapshot_path = _find_repo_root(Path(__file__).resolve()) / "data/processed/live_fixtures.json"
+    snapshot_path = _live_fixture_snapshot_path(Path(__file__).resolve())
     if not snapshot_path.exists():
         return []
 
@@ -183,8 +183,21 @@ def _estimate_lambdas(home_team: str, away_team: str) -> tuple[float, float]:
     return lambda_home, lambda_away
 
 
-def _find_repo_root(start: Path) -> Path:
+def _live_fixture_snapshot_path(start: Path) -> Path:
+    configured_snapshot = os.environ.get("LIVE_FIXTURE_SNAPSHOT")
+    if configured_snapshot:
+        return Path(configured_snapshot)
+
+    configured_root = os.environ.get("WORLDCUPQUANT_ROOT")
+    if configured_root:
+        return Path(configured_root) / "data/processed/live_fixtures.json"
+
+    data_root = _find_data_root(start)
+    return data_root / "processed/live_fixtures.json"
+
+
+def _find_data_root(start: Path) -> Path:
     for path in [start, *start.parents]:
-        if (path / "README.md").exists() and (path / "data").exists():
-            return path
-    raise FileNotFoundError("Could not find repository root")
+        if (path / "data").exists():
+            return path / "data"
+    return Path.cwd() / "data"
