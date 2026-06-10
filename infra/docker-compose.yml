@@ -32,8 +32,8 @@ services:
       INGEST_ADMIN_TOKEN: ${INGEST_ADMIN_TOKEN:-}
       LIVE_FIXTURE_PROVIDER: ${LIVE_FIXTURE_PROVIDER:-football-data}
       FOOTBALL_DATA_API_TOKEN: ${FOOTBALL_DATA_API_TOKEN:-}
-    ports:
-      - "8000:8000"
+    expose:
+      - "8000"
     depends_on:
       postgres:
         condition: service_healthy
@@ -49,10 +49,12 @@ services:
     build:
       context: ..
       dockerfile: infra/Dockerfile.web
+      args:
+        NEXT_PUBLIC_API_BASE_URL: ${NEXT_PUBLIC_API_BASE_URL:-http://localhost:8000}
     environment:
       NEXT_PUBLIC_API_BASE_URL: ${NEXT_PUBLIC_API_BASE_URL:-http://localhost:8000}
-    ports:
-      - "3000:3000"
+    expose:
+      - "3000"
     depends_on:
       api:
         condition: service_healthy

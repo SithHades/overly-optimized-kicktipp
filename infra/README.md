@@ -10,14 +10,16 @@ Local stack:
 Run:
 
 ```bash
-docker compose -f infra/docker-compose.yml up --build
+docker compose -f infra/docker-compose.yml -f infra/docker-compose.local.yml up --build
 ```
 
 Production target:
 
 - Deploy through Coolify.
+- Use `infra/docker-compose.yml` as the Compose file path.
 - Keep Postgres volume backups enabled.
-- Postgres and Redis are internal-only in this compose file. They do not publish host ports unless you add `ports:` mappings back.
+- Postgres, Redis, API, and web are internal-only in the production compose file. Assign domains to `web` on container port `3000` and `api` on container port `8000` in Coolify.
+- Keep host port mappings in `infra/docker-compose.local.yml` for local development only.
 - If you use existing Coolify Postgres/Redis services instead of the bundled ones, remove or disable the `postgres`/`redis` services and set `DATABASE_URL` / `REDIS_URL` on `api`.
 - If you keep the bundled services, set strong `POSTGRES_PASSWORD` and keep the `postgres-data` volume backed up.
 - Set `NEXT_PUBLIC_API_BASE_URL` to the public API URL if the frontend starts calling the API from the browser.
