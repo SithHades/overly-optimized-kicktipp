@@ -10,7 +10,7 @@ Local stack:
 Run:
 
 ```bash
-docker compose -f infra/docker-compose.yml -f infra/docker-compose.local.yml up --build
+docker compose --project-directory . -f infra/docker-compose.yml -f infra/docker-compose.local.yml up --build
 ```
 
 Production target:
