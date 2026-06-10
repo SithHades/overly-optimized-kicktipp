@@ -1,0 +1,1 @@
+"""WorldCupQuant API package."""

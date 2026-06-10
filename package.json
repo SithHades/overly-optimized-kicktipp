@@ -1,0 +1,14 @@
+{
+  "name": "worldcupquant",
+  "private": true,
+  "packageManager": "pnpm@9.15.0",
+  "scripts": {
+    "dev": "pnpm --filter @worldcupquant/web dev",
+    "build": "pnpm --filter @worldcupquant/web build",
+    "lint": "pnpm --filter @worldcupquant/web lint",
+    "typecheck": "pnpm --filter @worldcupquant/web typecheck"
+  },
+  "devDependencies": {
+    "turbo": "^2.5.0"
+  }
+}

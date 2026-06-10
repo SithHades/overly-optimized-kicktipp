@@ -1,0 +1,29 @@
+[
+  {
+    "id": 1,
+    "date": "2026-06-11T19:00:00Z",
+    "stage": "Group A",
+    "home_team": "Germany",
+    "away_team": "Japan",
+    "lambda_home": 1.64,
+    "lambda_away": 1.08
+  },
+  {
+    "id": 2,
+    "date": "2026-06-12T16:00:00Z",
+    "stage": "Group B",
+    "home_team": "Brazil",
+    "away_team": "Denmark",
+    "lambda_home": 1.72,
+    "lambda_away": 0.92
+  },
+  {
+    "id": 3,
+    "date": "2026-06-12T21:00:00Z",
+    "stage": "Group C",
+    "home_team": "Uruguay",
+    "away_team": "Mexico",
+    "lambda_home": 1.31,
+    "lambda_away": 1.18
+  }
+]

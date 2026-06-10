@@ -1,0 +1,1 @@
+"""WorldCupQuant modeling package."""

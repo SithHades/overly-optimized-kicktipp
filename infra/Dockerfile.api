@@ -1,0 +1,13 @@
+FROM ghcr.io/astral-sh/uv:python3.12-bookworm-slim
+
+WORKDIR /app
+
+COPY ml ./ml
+COPY apps/api ./apps/api
+COPY data ./data
+
+RUN uv sync --project apps/api
+
+EXPOSE 8000
+
+CMD ["uv", "run", "--project", "apps/api", "uvicorn", "worldcup_api.main:app", "--host", "0.0.0.0", "--port", "8000"]
