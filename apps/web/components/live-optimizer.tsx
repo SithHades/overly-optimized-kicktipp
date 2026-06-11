@@ -36,6 +36,15 @@ type MatchPreview = {
   confidence: number;
 };
 
+const previewProgressPhases = [
+  { delay: 0, message: "Checking Redis cache for this match and model..." },
+  { delay: 1800, message: "No cached preview yet. Preparing the OpenRouter request..." },
+  { delay: 6000, message: "Running web search for recent tactics, squad news, and availability..." },
+  { delay: 25000, message: "The model is drafting the tactical preview from the gathered context..." },
+  { delay: 60000, message: "Validating the response shape and repairing JSON if needed..." },
+  { delay: 105000, message: "Still waiting on OpenRouter web search. First runs can take close to two minutes..." }
+];
+
 export function LiveOptimizer() {
   const [predictions, setPredictions] = useState<Prediction[]>([]);
   const [selectedMatchId, setSelectedMatchId] = useState<number | null>(null);
@@ -45,6 +54,7 @@ export function LiveOptimizer() {
   const [optimized, setOptimized] = useState<Prediction | null>(null);
   const [preview, setPreview] = useState<MatchPreview | null>(null);
   const [previewLoading, setPreviewLoading] = useState(false);
+  const [previewStatus, setPreviewStatus] = useState<string | null>(null);
   const [previewError, setPreviewError] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -90,6 +100,7 @@ export function LiveOptimizer() {
     setError(null);
     setPreview(null);
     setPreviewError(null);
+    setPreviewStatus(null);
     try {
       const params = new URLSearchParams({
         exact_score: String(exactScore),
@@ -117,9 +128,13 @@ export function LiveOptimizer() {
     const previewUrl = `${apiBaseUrl()}/api/matches/${selectedMatchId}/preview`;
     const controller = new AbortController();
     const timeout = window.setTimeout(() => controller.abort(), 180000);
+    const progressTimers = previewProgressPhases.map((phase) =>
+      window.setTimeout(() => setPreviewStatus(phase.message), phase.delay)
+    );
 
     setPreviewLoading(true);
     setPreviewError(null);
+    setPreviewStatus(previewProgressPhases[0].message);
     try {
       const response = await fetch(previewUrl, {
         cache: "no-store",
@@ -130,6 +145,7 @@ export function LiveOptimizer() {
         throw new Error(detail ? `AI preview unavailable: ${detail}` : `AI preview unavailable (${response.status})`);
       }
       setPreview((await response.json()) as MatchPreview);
+      setPreviewStatus("Preview ready. Future clicks for this match/model should use the Redis cache.");
     } catch (caught) {
       if (caught instanceof DOMException && caught.name === "AbortError") {
         setPreviewError("AI preview timed out after 180 seconds. Check the API container logs and OpenRouter settings.");
@@ -138,6 +154,7 @@ export function LiveOptimizer() {
       }
     } finally {
       window.clearTimeout(timeout);
+      progressTimers.forEach((timer) => window.clearTimeout(timer));
       setPreviewLoading(false);
     }
   }
@@ -245,7 +262,23 @@ export function LiveOptimizer() {
                   <BrainCircuit className="h-4 w-4 text-terminal-cyan" />
                   AI Preview
                 </div>
-                {previewLoading ? <p className="text-sm text-terminal-muted">Generating preview...</p> : null}
+                {previewStatus ? (
+                  <div className="mb-3 border border-terminal-line bg-terminal-panel/60 p-3">
+                    <div className="flex items-center gap-2 text-sm text-terminal-muted">
+                      {previewLoading ? (
+                        <span className="h-2 w-2 animate-pulse bg-terminal-cyan" aria-hidden="true" />
+                      ) : (
+                        <span className="h-2 w-2 bg-terminal-green" aria-hidden="true" />
+                      )}
+                      <span>{previewStatus}</span>
+                    </div>
+                    {previewLoading ? (
+                      <div className="mt-2 h-1 overflow-hidden bg-terminal-line">
+                        <div className="h-full w-1/3 animate-[pulse_1.5s_ease-in-out_infinite] bg-terminal-cyan" />
+                      </div>
+                    ) : null}
+                  </div>
+                ) : null}
                 {previewError ? <p className="text-sm text-terminal-red">{previewError}</p> : null}
                 {preview ? (
                   <div className="space-y-3 text-sm text-terminal-muted">
