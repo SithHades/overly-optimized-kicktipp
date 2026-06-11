@@ -38,7 +38,10 @@ def test_prediction_endpoint_accepts_scoring_rules(monkeypatch) -> None:
 def test_match_preview_endpoint_returns_ai_preview(monkeypatch) -> None:
     class FakePreview(BaseModel):
         fixture: str = "Germany vs France"
-        tactical_preview: str = "Compact midfields and transition chances."
+        tactical_preview: str = (
+            "Germany should try to control midfield possession while France looks for fast "
+            "transitions behind the full-backs and pressure after turnovers."
+        )
         key_factors: list[str] = Field(default_factory=lambda: ["Rest defense", "Set pieces"])
         upset_scenario: str = "An early set-piece goal changes the game state."
         injury_watch: list[str] = Field(default_factory=list)
@@ -57,4 +60,36 @@ def test_match_preview_endpoint_returns_ai_preview(monkeypatch) -> None:
     assert response.status_code == 200
     payload = response.json()
     assert payload["fixture"]
-    assert payload["tactical_preview"] == "Compact midfields and transition chances."
+    assert "control midfield" in payload["tactical_preview"]
+
+
+def test_match_preview_endpoint_uses_cached_preview(monkeypatch) -> None:
+    from worldcup_api.routers import predictions
+    from worldcup_api.schemas.predictions import MatchPreviewResponse
+
+    cached = MatchPreviewResponse(
+        fixture="Cached fixture",
+        tactical_preview=(
+            "The cached preview describes pressing structure, transition defense, and set-piece "
+            "risk in complete football-analysis sentences."
+        ),
+        key_factors=["Transition defense", "Set pieces"],
+        upset_scenario="An early goal lets the underdog defend deeper.",
+        injury_watch=[],
+        source_urls=[],
+        confidence=0.7,
+    )
+
+    monkeypatch.delenv("DATABASE_URL", raising=False)
+    monkeypatch.setattr(predictions, "_read_cached_preview", lambda cache_key: cached)
+    monkeypatch.setattr(
+        predictions,
+        "generate_match_preview",
+        lambda *args, **kwargs: (_ for _ in ()).throw(AssertionError("cache miss")),
+    )
+    client = TestClient(app)
+
+    response = client.get("/api/matches/1/preview")
+
+    assert response.status_code == 200
+    assert response.json()["fixture"] == "Cached fixture"
