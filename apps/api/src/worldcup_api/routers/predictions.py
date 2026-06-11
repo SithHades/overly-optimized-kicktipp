@@ -49,7 +49,13 @@ def get_match_preview(match_id: int) -> MatchPreviewResponse:
         raise HTTPException(status_code=404, detail="Match not found")
 
     try:
-        preview = generate_match_preview(fixture.home_team, fixture.away_team)
+        preview = generate_match_preview(
+            fixture.home_team,
+            fixture.away_team,
+            match_date=fixture.date,
+            stage=fixture.group_name or fixture.stage,
+            venue=fixture.venue,
+        )
     except RuntimeError as exc:
         logger.warning("AI preview failed match_id=%s error=%s", match_id, exc)
         raise HTTPException(status_code=503, detail=str(exc)) from exc

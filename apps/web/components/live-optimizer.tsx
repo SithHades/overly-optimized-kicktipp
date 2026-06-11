@@ -116,7 +116,7 @@ export function LiveOptimizer() {
     }
     const previewUrl = `${apiBaseUrl()}/api/matches/${selectedMatchId}/preview`;
     const controller = new AbortController();
-    const timeout = window.setTimeout(() => controller.abort(), 35000);
+    const timeout = window.setTimeout(() => controller.abort(), 180000);
 
     setPreviewLoading(true);
     setPreviewError(null);
@@ -132,7 +132,7 @@ export function LiveOptimizer() {
       setPreview((await response.json()) as MatchPreview);
     } catch (caught) {
       if (caught instanceof DOMException && caught.name === "AbortError") {
-        setPreviewError("AI preview timed out after 35 seconds. Check the API container logs and OpenRouter settings.");
+        setPreviewError("AI preview timed out after 180 seconds. Check the API container logs and OpenRouter settings.");
       } else {
         setPreviewError(caught instanceof Error ? caught.message : "AI preview failed");
       }

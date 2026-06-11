@@ -48,7 +48,7 @@ def test_match_preview_endpoint_returns_ai_preview(monkeypatch) -> None:
     monkeypatch.delenv("DATABASE_URL", raising=False)
     monkeypatch.setattr(
         "worldcup_api.routers.predictions.generate_match_preview",
-        lambda home_team, away_team: FakePreview(fixture=f"{home_team} vs {away_team}"),
+        lambda home_team, away_team, **_: FakePreview(fixture=f"{home_team} vs {away_team}"),
     )
     client = TestClient(app)
 

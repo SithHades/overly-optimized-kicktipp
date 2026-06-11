@@ -1,9 +1,10 @@
+import json
 import os
 from typing import TypeVar
 
 import httpx
-from pydantic import ValidationError
 from pydantic import BaseModel
+from pydantic import ValidationError
 
 T = TypeVar("T", bound=BaseModel)
 
@@ -25,7 +26,7 @@ class OpenRouterStructuredClient:
         self.api_key = api_key or os.environ.get("OPENROUTER_API_KEY")
         self.model = model or os.environ.get("OPENROUTER_MODEL", "openai/gpt-4.1-mini")
         self.base_url = base_url.rstrip("/")
-        self.timeout_seconds = timeout_seconds or float(os.environ.get("OPENROUTER_TIMEOUT_SECONDS", "25"))
+        self.timeout_seconds = timeout_seconds or float(os.environ.get("OPENROUTER_TIMEOUT_SECONDS", "180"))
 
     def complete_structured(
         self,
@@ -41,7 +42,13 @@ class OpenRouterStructuredClient:
         return self._post_and_parse(body, schema, use_web_search=use_web_search)
 
     def parse_response(self, payload: str, schema: type[T]) -> T:
-        return schema.model_validate_json(payload)
+        try:
+            return schema.model_validate_json(payload)
+        except (ValueError, ValidationError):
+            extracted = _extract_json_object(payload)
+            if extracted is None:
+                raise
+            return schema.model_validate(extracted)
 
     def _request_body(self, messages: list[dict[str, str]], schema: type[T]) -> dict[str, object]:
         return {
@@ -75,10 +82,7 @@ class OpenRouterStructuredClient:
 
         response = self._post(body)
         if response.status_code >= 400 and "response_format" in body:
-            fallback_body = self._fallback_request_body(body["messages"], schema)
-            if use_web_search:
-                fallback_body["plugins"] = body.get("plugins", [])
-            response = self._post(fallback_body)
+            response = self._post(self._fallback_body_with_plugins(body, schema, use_web_search))
 
         try:
             response.raise_for_status()
@@ -91,8 +95,65 @@ class OpenRouterStructuredClient:
         content = payload["choices"][0]["message"]["content"]
         try:
             return self.parse_response(content, schema)
-        except ValidationError as exc:
-            raise RuntimeError(f"OpenRouter returned non-matching JSON: {content[:500]}") from exc
+        except (ValueError, ValidationError, RuntimeError):
+            healed = self._heal_response(content, schema)
+            if healed is not None:
+                return healed
+            fallback_response = self._post(self._fallback_body_with_plugins(body, schema, use_web_search))
+            try:
+                fallback_response.raise_for_status()
+            except httpx.HTTPStatusError as exc:
+                raise RuntimeError(
+                    f"OpenRouter returned {fallback_response.status_code}: {fallback_response.text[:500]}"
+                ) from exc
+            fallback_content = fallback_response.json()["choices"][0]["message"]["content"]
+            try:
+                return self.parse_response(fallback_content, schema)
+            except (ValueError, ValidationError, RuntimeError) as exc:
+                raise RuntimeError(f"OpenRouter returned non-matching JSON: {fallback_content[:500]}") from exc
+
+    def _heal_response(self, content: str, schema: type[T]) -> T | None:
+        healing_body = {
+            "model": self.model,
+            "messages": [
+                {
+                    "role": "system",
+                    "content": (
+                        "You repair model output into valid JSON. Return only JSON. "
+                        "Do not add facts, do not use Markdown, and preserve the original content."
+                    ),
+                },
+                {
+                    "role": "user",
+                    "content": (
+                        "Repair this response so it matches the schema.\n\n"
+                        f"Schema: {schema.model_json_schema()}\n\n"
+                        f"Response:\n{content}"
+                    ),
+                },
+            ],
+        }
+        try:
+            response = self._post(healing_body)
+            response.raise_for_status()
+            healed_content = response.json()["choices"][0]["message"]["content"]
+            return self.parse_response(healed_content, schema)
+        except Exception:
+            return None
+
+    def _fallback_body_with_plugins(
+        self,
+        body: dict[str, object],
+        schema: type[T],
+        use_web_search: bool,
+    ) -> dict[str, object]:
+        messages = body["messages"]
+        if not isinstance(messages, list):
+            raise RuntimeError("OpenRouter request body is missing messages")
+        fallback_body = self._fallback_request_body(messages, schema)
+        if use_web_search:
+            fallback_body["plugins"] = body.get("plugins", [])
+        return fallback_body
 
     def _post(self, body: dict[str, object]) -> httpx.Response:
         try:
@@ -111,3 +172,22 @@ class OpenRouterStructuredClient:
             raise RuntimeError(f"OpenRouter request timed out after {self.timeout_seconds:.0f}s") from exc
         except httpx.HTTPError as exc:
             raise RuntimeError(f"OpenRouter request failed before response: {exc}") from exc
+
+
+def _extract_json_object(payload: str) -> dict[str, object] | None:
+    decoder = json.JSONDecoder()
+    cleaned = payload.strip()
+    if cleaned.startswith("```"):
+        cleaned = cleaned.strip("`")
+        if cleaned.startswith("json"):
+            cleaned = cleaned[4:]
+    for index, character in enumerate(cleaned):
+        if character != "{":
+            continue
+        try:
+            value, _ = decoder.raw_decode(cleaned[index:])
+        except json.JSONDecodeError:
+            continue
+        if isinstance(value, dict):
+            return value
+    return None
