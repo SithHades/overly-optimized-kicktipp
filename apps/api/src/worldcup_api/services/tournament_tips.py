@@ -8,7 +8,7 @@ from typing import Any
 
 from sqlalchemy import create_engine, text
 
-from worldcup_api.services.team_strength import MODEL_VERSION, estimate_lambdas, strength_score
+from worldcup_api.services.team_strength import BASE_ELO, MODEL_VERSION, estimate_lambdas
 from worldcup_model.data.live.postgres import _ensure_live_schema
 from worldcup_model.models.poisson import outcome_probabilities, score_distribution
 
@@ -35,6 +35,8 @@ class DbMatch:
     group_name: str | None
     home_team: str
     away_team: str
+    home_elo: float | None
+    away_elo: float | None
     home_score: int | None
     away_score: int | None
     status: str
@@ -159,7 +161,10 @@ def _load_matches(database_url: str) -> list[DbMatch]:
             text(
                 """
                 SELECT m.id, m.date, m.group_name, home_team.name AS home_team,
-                       away_team.name AS away_team, m.home_score, m.away_score, m.status
+                       away_team.name AS away_team,
+                       home_team.current_elo AS home_elo,
+                       away_team.current_elo AS away_elo,
+                       m.home_score, m.away_score, m.status
                 FROM matches m
                 JOIN teams home_team ON home_team.id = m.home_team_id
                 JOIN teams away_team ON away_team.id = m.away_team_id
@@ -175,6 +180,8 @@ def _load_matches(database_url: str) -> list[DbMatch]:
                 group_name=row["group_name"],
                 home_team=row["home_team"],
                 away_team=row["away_team"],
+                home_elo=float(row["home_elo"]) if row["home_elo"] is not None else None,
+                away_elo=float(row["away_elo"]) if row["away_elo"] is not None else None,
                 home_score=row["home_score"],
                 away_score=row["away_score"],
                 status=row["status"] or "scheduled",
@@ -195,7 +202,7 @@ def _project_group_winners(matches: list[DbMatch]) -> dict[str, dict[str, Any]]:
         if match.status == "finished" and match.home_score is not None and match.away_score is not None:
             home_points, away_points = _actual_points(match.home_score, match.away_score)
         else:
-            lambda_home, lambda_away = estimate_lambdas(match.home_team, match.away_team)
+            lambda_home, lambda_away = estimate_lambdas(match.home_elo, match.away_elo)
             outcomes = outcome_probabilities(score_distribution(lambda_home, lambda_away))
             home_points = 3 * outcomes.home_win + outcomes.draw
             away_points = 3 * outcomes.away_win + outcomes.draw
@@ -206,7 +213,7 @@ def _project_group_winners(matches: list[DbMatch]) -> dict[str, dict[str, Any]]:
     for group_name, table in points_by_group.items():
         ranked = sorted(
             table.items(),
-            key=lambda item: (item[1], _strength(item[0])),
+            key=lambda item: (item[1], _team_elo(item[0], matches)),
             reverse=True,
         )
         if not ranked:
@@ -235,7 +242,7 @@ def _project_team_scores(
     for team in teams:
         current_points = _current_group_points(team, matches)
         winner_bonus = 8.0 if team in group_winner_teams else 0.0
-        scores[team] = _strength(team) + current_points * 2.0 + winner_bonus
+        scores[team] = (_team_elo(team, matches) - BASE_ELO) / 10 + current_points * 2.0 + winner_bonus
     return scores
 
 
@@ -244,7 +251,7 @@ def _project_top_scorer(team_scores: dict[str, float]) -> dict[str, Any]:
     scored_candidates: list[dict[str, Any]] = []
     for candidate in TOP_SCORER_CANDIDATES:
         goals = current_goals.get(candidate["player"], 0)
-        team_score = team_scores.get(candidate["team"], _strength(candidate["team"]))
+        team_score = team_scores.get(candidate["team"], (BASE_ELO - BASE_ELO) / 10)
         projection_score = team_score * candidate["role_score"] + goals * 18
         scored_candidates.append(
             {
@@ -353,8 +360,13 @@ def _json_dumps(value: Any) -> str:
     return json.dumps(value, default=str)
 
 
-def _strength(team: str) -> float:
-    return strength_score(team)
+def _team_elo(team: str, matches: list[DbMatch]) -> float:
+    for match in matches:
+        if match.home_team == team and match.home_elo is not None:
+            return match.home_elo
+        if match.away_team == team and match.away_elo is not None:
+            return match.away_elo
+    return BASE_ELO
 
 
 def _is_group_team(team: str) -> bool:

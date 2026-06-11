@@ -178,6 +178,8 @@ function toPredictionRow(prediction: PredictionResponse): PredictionRow {
     confidenceReason: prediction.confidence.reason,
     homeElo: prediction.home_rating.model_elo,
     awayElo: prediction.away_rating.model_elo,
+    homeRatingKnown: prediction.home_rating.known_rating,
+    awayRatingKnown: prediction.away_rating.known_rating,
     ratingDelta: prediction.rating_delta,
     expectedGoals: `${prediction.lambda_home.toFixed(2)}-${prediction.lambda_away.toFixed(2)}`,
     modelVersion: prediction.model_context.model_version,

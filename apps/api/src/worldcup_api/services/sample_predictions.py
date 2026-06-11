@@ -53,8 +53,8 @@ def build_prediction_for_fixture(
     )
     best_tip = expected_tippspiel_points(distribution, rules, max_pick_goals=5)
     confidence = _prediction_confidence(outcomes.home_win, outcomes.draw, outcomes.away_win)
-    home_rating = _team_rating(fixture.home_team)
-    away_rating = _team_rating(fixture.away_team)
+    home_rating = _team_rating(fixture.home_team, fixture.home_elo)
+    away_rating = _team_rating(fixture.away_team, fixture.away_elo)
 
     return PredictionResponse(
         match=to_match_summary(fixture),
@@ -83,9 +83,14 @@ def build_prediction_for_fixture(
             model_version=MODEL_VERSION,
             data_source=f"{fixture.source} fixtures saved in Postgres, then scored on demand.",
             training_status=MODEL_TRAINING_STATUS,
-            rating_source=rating_source_note(fixture.home_team, fixture.away_team),
+            rating_source=rating_source_note(
+                fixture.home_team,
+                fixture.away_team,
+                fixture.home_elo,
+                fixture.away_elo,
+            ),
             explanation=[
-                "Each team starts with a seeded model Elo-style rating.",
+                "Each team rating is fitted from completed historical World Cup matches.",
                 "The rating gap is converted into expected goals for a Poisson score model.",
                 "The 1X2 probabilities come from the full scoreline distribution.",
                 "The recommended Tipp maximizes expected points under the configured scoring rules.",
@@ -99,13 +104,13 @@ def build_prediction_for_fixture(
     )
 
 
-def _team_rating(team: str) -> TeamRating:
+def _team_rating(team: str, rating: float | None) -> TeamRating:
     return TeamRating(
         team=team,
-        model_elo=model_elo(team),
-        strength_score=strength_score(team),
-        tier=rating_tier(team),
-        known_rating=rating_known(team),
+        model_elo=model_elo(team, rating),
+        strength_score=strength_score(team, rating),
+        tier=rating_tier(team, rating),
+        known_rating=rating_known(rating),
     )
 
 

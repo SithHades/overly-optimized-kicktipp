@@ -39,9 +39,9 @@ export function DashboardShell({ children }: { children: React.ReactNode }) {
       </header>
       <section className="mx-auto max-w-7xl px-4 py-4">
         <div className="mb-4 flex flex-wrap gap-2">
-          <Badge tone="cyan">Baseline: Model Elo + Poisson</Badge>
+          <Badge tone="cyan">Model: historical Elo + Poisson</Badge>
           <Badge tone="green">Fixtures: live API</Badge>
-          <Badge tone="amber">Training: not fitted yet</Badge>
+          <Badge tone="amber">Ratings: World Cup history</Badge>
         </div>
         {children}
       </section>

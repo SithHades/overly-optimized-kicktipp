@@ -5,16 +5,16 @@ import { Badge } from "@/components/ui/badge";
 
 const modelRows = [
   {
-    name: "Model Elo prior",
+    name: "Historical World Cup Elo",
     status: "active",
     role: "Ranks team strength before kickoff",
-    caveat: "Seeded manually; not learned from match history yet"
+    caveat: "Fitted from completed World Cup results fetched from openfootball"
   },
   {
     name: "Poisson score model",
     status: "active",
     role: "Turns expected goals into scoreline probabilities",
-    caveat: "Uses baseline lambdas from rating gaps"
+    caveat: "Uses expected goals derived from historical Elo gaps"
   },
   {
     name: "Tipp EV optimizer",
@@ -34,7 +34,7 @@ const dataLineage = [
   "Fixtures and match status come from football-data.org via the ingest endpoint.",
   "Teams are upserted into Postgres and predictions are generated on request.",
   "Tournament tips are regenerated after ingest and stored as pre_tournament/current phases.",
-  "No automatic retraining exists yet; model parameters change only when code or seeded priors change."
+  "No scheduled retraining exists yet; ratings refresh when fixture ingest or the Elo admin endpoint runs."
 ];
 
 export default function ModelLabPage() {
@@ -92,8 +92,8 @@ export default function ModelLabPage() {
               <h2 className="text-lg font-semibold">Calibration Status</h2>
             </div>
             <p className="text-sm text-terminal-muted">
-              Calibration is not proven yet. The app should treat confidence labels as probability-spread
-              diagnostics until historical backtests are wired in.
+              Elo fitting is now data-driven, but calibration is not fully proven yet. Confidence labels should
+              still be treated as probability-spread diagnostics until backtests are published.
             </p>
           </div>
 
@@ -104,7 +104,8 @@ export default function ModelLabPage() {
                 <h2 className="text-lg font-semibold">Retraining</h2>
               </div>
               <p className="text-sm text-terminal-muted">
-                There is no scheduled retraining job yet. Fixture ingest refreshes data and tournament tips only.
+                Fixture ingest ensures historical Elo ratings exist, then refreshes tournament tips. Use the
+                Elo admin endpoint with force=true to refit ratings from source history.
               </p>
             </div>
             <div className="border border-terminal-line bg-terminal-panel p-4">
@@ -113,8 +114,7 @@ export default function ModelLabPage() {
                 <h2 className="text-lg font-semibold">Next Upgrade</h2>
               </div>
               <p className="text-sm text-terminal-muted">
-                Add historical match results, fit ratings, then publish log loss, Brier score, and calibration
-                curves per model version.
+                Publish backtested log loss, Brier score, and calibration curves per model version.
               </p>
             </div>
           </div>

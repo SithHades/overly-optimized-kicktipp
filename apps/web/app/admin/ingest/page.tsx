@@ -10,6 +10,7 @@ type IngestResponse = {
   provider: string;
   fixture_count: number;
   postgres_upserts: number;
+  elo_team_count: number;
   tournament_tip_count: number;
   warnings: string[];
 };
@@ -87,7 +88,8 @@ export default function AdminIngestPage() {
 
         {result ? (
           <div className="mt-4 border border-terminal-line bg-terminal-bg p-3 font-mono text-sm text-terminal-green">
-            {result.provider}: {result.postgres_upserts} match upserts, {result.tournament_tip_count} tournament Tipps
+            {result.provider}: {result.postgres_upserts} match upserts, {result.elo_team_count} Elo-rated teams,{" "}
+            {result.tournament_tip_count} tournament Tipps
           </div>
         ) : null}
 

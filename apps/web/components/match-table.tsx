@@ -45,6 +45,9 @@ export function MatchTable({ rows }: { rows: PredictionRow[] }) {
                       {row.ratingDelta && row.ratingDelta > 0 ? "+" : ""}
                       {row.ratingDelta ?? 0}
                     </div>
+                    {!row.homeRatingKnown || !row.awayRatingKnown ? (
+                      <div className="text-terminal-muted">neutral fallback</div>
+                    ) : null}
                   </>
                 ) : (
                   "-"

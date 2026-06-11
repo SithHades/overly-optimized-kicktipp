@@ -59,7 +59,7 @@ export function LiveFixtureTable() {
         <div>
           <h2 className="text-lg font-semibold text-terminal-ink">Live Fixture Feed</h2>
           <p className="text-sm text-terminal-muted">
-            {exportedAt ? `Last ingest export: ${exportedAt}` : "Loaded from API match feed"}
+            {exportedAt ? `Last ingest export: ${exportedAt}` : `Loaded ${fixtures.length} matches from API match feed`}
           </p>
         </div>
         <Button onClick={() => window.location.reload()}>
@@ -93,7 +93,7 @@ export function LiveFixtureTable() {
                 </td>
               </tr>
             ) : null}
-            {fixtures.slice(0, 24).map((fixture) => (
+            {fixtures.map((fixture) => (
               <tr key={`${fixture.source}-${fixture.source_match_id}`} className="bg-terminal-bg odd:bg-terminal-panel/45">
                 <td className="whitespace-nowrap border-b border-terminal-line px-3 py-3 font-mono text-xs text-terminal-muted">
                   {new Date(fixture.date).toLocaleString()}

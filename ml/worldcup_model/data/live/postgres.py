@@ -115,6 +115,18 @@ def _ensure_live_schema(connection) -> None:
         """,
         "CREATE INDEX IF NOT EXISTS idx_matches_date ON matches(date)",
         """
+        CREATE TABLE IF NOT EXISTS model_runs (
+          id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+          created_at timestamptz NOT NULL DEFAULT now(),
+          git_sha text,
+          train_data_until date,
+          model_type text NOT NULL,
+          metrics jsonb NOT NULL DEFAULT '{}',
+          artifact_path text,
+          is_active boolean NOT NULL DEFAULT false
+        )
+        """,
+        """
         CREATE TABLE IF NOT EXISTS tournament_tips (
           id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
           phase text NOT NULL,
@@ -123,7 +135,7 @@ def _ensure_live_schema(connection) -> None:
           answer jsonb NOT NULL,
           confidence double precision NOT NULL DEFAULT 0,
           generated_at timestamptz NOT NULL DEFAULT now(),
-          model_version text NOT NULL DEFAULT 'baseline-strength-v1',
+          model_version text NOT NULL DEFAULT 'historical-world-cup-elo-v1',
           source_state jsonb NOT NULL DEFAULT '{}',
           UNIQUE (phase, question_key)
         )

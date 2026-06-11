@@ -12,6 +12,8 @@ export type PredictionRow = {
   confidenceReason?: string;
   homeElo?: number;
   awayElo?: number;
+  homeRatingKnown?: boolean;
+  awayRatingKnown?: boolean;
   ratingDelta?: number;
   expectedGoals?: string;
   modelVersion?: string;

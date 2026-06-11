@@ -24,6 +24,8 @@ class PredictionFixture:
     away_team: str
     venue: str | None
     status: str
+    home_elo: float | None
+    away_elo: float | None
     lambda_home: float
     lambda_away: float
 
@@ -49,6 +51,8 @@ def load_prediction_fixtures() -> list[PredictionFixture]:
             away_team=fixture.away_team,
             venue=None,
             status="scheduled",
+            home_elo=None,
+            away_elo=None,
             lambda_home=fixture.lambda_home,
             lambda_away=fixture.lambda_away,
         )
@@ -83,7 +87,7 @@ def _load_live_fixtures() -> list[PredictionFixture]:
     result = read_snapshot(snapshot_path)
     fixtures: list[PredictionFixture] = []
     for index, fixture in enumerate(result.fixtures, start=1):
-        lambda_home, lambda_away = estimate_lambdas(fixture.home_team, fixture.away_team)
+        lambda_home, lambda_away = estimate_lambdas(None, None)
         fixtures.append(
             PredictionFixture(
                 id=index,
@@ -96,6 +100,8 @@ def _load_live_fixtures() -> list[PredictionFixture]:
                 away_team=fixture.away_team,
                 venue=fixture.venue,
                 status=fixture.status.value,
+                home_elo=None,
+                away_elo=None,
                 lambda_home=lambda_home,
                 lambda_away=lambda_away,
             )
@@ -123,6 +129,8 @@ def _load_database_fixtures() -> list[PredictionFixture]:
                       m.group_name,
                       home_team.name AS home_team,
                       away_team.name AS away_team,
+                      home_team.current_elo AS home_elo,
+                      away_team.current_elo AS away_elo,
                       m.venue,
                       m.status
                     FROM matches m
@@ -135,7 +143,9 @@ def _load_database_fixtures() -> list[PredictionFixture]:
             ).mappings()
             fixtures: list[PredictionFixture] = []
             for row in rows:
-                lambda_home, lambda_away = estimate_lambdas(row["home_team"], row["away_team"])
+                home_elo = float(row["home_elo"]) if row["home_elo"] is not None else None
+                away_elo = float(row["away_elo"]) if row["away_elo"] is not None else None
+                lambda_home, lambda_away = estimate_lambdas(home_elo, away_elo)
                 fixtures.append(
                     PredictionFixture(
                         id=row["id"],
@@ -148,6 +158,8 @@ def _load_database_fixtures() -> list[PredictionFixture]:
                         away_team=row["away_team"],
                         venue=row["venue"],
                         status=row["status"] or "scheduled",
+                        home_elo=home_elo,
+                        away_elo=away_elo,
                         lambda_home=lambda_home,
                         lambda_away=lambda_away,
                     )

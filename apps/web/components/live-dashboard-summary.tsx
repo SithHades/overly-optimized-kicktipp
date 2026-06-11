@@ -92,7 +92,7 @@ export function LiveDashboardSummary() {
     },
     {
       label: "Model run",
-      value: winnerTip?.model_version ?? "baseline-strength-v1",
+      value: winnerTip?.model_version ?? "historical-world-cup-elo-v1",
       subvalue: winnerTip ? new Date(winnerTip.generated_at).toLocaleString() : "not generated",
       icon: BrainCircuit
     },
@@ -162,12 +162,13 @@ export function LiveDashboardSummary() {
           </div>
           <div className="space-y-3 text-sm text-terminal-muted">
             <p>
-              This is a transparent baseline, not a trained black-box model. It starts from model Elo-style
-              team ratings, converts the rating gap into expected goals, then runs a Poisson score model.
+              This is a transparent model, not a black box. It fetches completed historical World Cup matches,
+              fits Elo ratings chronologically, converts the rating gap into expected goals, then runs a Poisson
+              score model.
             </p>
             <p>
               {winnerTip
-                ? `${stringField(winnerTip.answer.team) ?? "The leader"} is on top because its seeded rating and projected bracket score currently rank first. This should be treated as a baseline prior, not a guarantee.`
+                ? `${stringField(winnerTip.answer.team) ?? "The leader"} is on top because its historical World Cup Elo and projected bracket score currently rank first. This is still a model estimate, not a guarantee.`
                 : "The tournament winner card appears after fixture ingest creates tournament projections."}
             </p>
             <p>
