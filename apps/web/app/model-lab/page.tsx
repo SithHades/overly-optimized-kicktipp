@@ -5,10 +5,10 @@ import { Badge } from "@/components/ui/badge";
 
 const modelRows = [
   {
-    name: "Historical World Cup Elo",
+    name: "Historical International Elo",
     status: "active",
     role: "Ranks team strength before kickoff",
-    caveat: "Fitted from completed World Cup results fetched from openfootball"
+    caveat: "Fitted from international results with recency decay"
   },
   {
     name: "Poisson score model",

@@ -135,7 +135,7 @@ def _ensure_live_schema(connection) -> None:
           answer jsonb NOT NULL,
           confidence double precision NOT NULL DEFAULT 0,
           generated_at timestamptz NOT NULL DEFAULT now(),
-          model_version text NOT NULL DEFAULT 'historical-world-cup-elo-v1',
+          model_version text NOT NULL DEFAULT 'historical-international-elo-v2',
           source_state jsonb NOT NULL DEFAULT '{}',
           UNIQUE (phase, question_key)
         )

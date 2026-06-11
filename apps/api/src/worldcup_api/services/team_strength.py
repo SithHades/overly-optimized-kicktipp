@@ -1,7 +1,9 @@
 from __future__ import annotations
 
+import csv
 from dataclasses import dataclass
 from datetime import date
+from io import StringIO
 from math import log
 from typing import Any
 
@@ -11,11 +13,17 @@ from sqlalchemy import create_engine, text
 from worldcup_model.data.live.postgres import _ensure_live_schema
 from worldcup_model.models.elo import expected_score
 
-MODEL_VERSION = "historical-world-cup-elo-v1"
-MODEL_TRAINING_STATUS = "Fitted from completed men's World Cup matches from 1930 through 2022."
-RATING_SOURCE = "Historical World Cup match results fetched from openfootball/worldcup.json."
+MODEL_VERSION = "historical-international-elo-v2"
+MODEL_TRAINING_STATUS = (
+    "Fitted from historical men's international matches with recency decay, home-field adjustment, "
+    "and tournament-importance weights."
+)
+RATING_SOURCE = "Historical international match results fetched from martj42/international_results."
+INTERNATIONAL_RESULTS_URL = "https://raw.githubusercontent.com/martj42/international_results/master/results.csv"
 BASE_ELO = 1500.0
 K_FACTOR = 32.0
+ANNUAL_ELO_DECAY = 0.035
+HOME_FIELD_ELO = 55.0
 
 WORLD_CUP_YEARS = [
     1930,
@@ -72,6 +80,7 @@ class HistoricalMatch:
     away_team: str
     home_score: int
     away_score: int
+    neutral: bool = True
 
 
 @dataclass(frozen=True)
@@ -102,7 +111,7 @@ def refresh_elo_ratings(database_url: str, force: bool = False) -> EloRefreshRes
                 top_ratings=_top_ratings(ratings),
             )
 
-    matches, fetched_years, skipped_years = fetch_historical_world_cup_matches()
+    matches, fetched_years, skipped_years = fetch_historical_international_matches()
     ratings = compute_elo_ratings(matches)
 
     with engine.begin() as connection:
@@ -140,6 +149,9 @@ def refresh_elo_ratings(database_url: str, force: bool = False) -> EloRefreshRes
                         "fetched_years": fetched_years,
                         "skipped_years": skipped_years,
                         "rating_source": RATING_SOURCE,
+                        "annual_elo_decay": ANNUAL_ELO_DECAY,
+                        "base_k_factor": K_FACTOR,
+                        "home_field_elo": HOME_FIELD_ELO,
                     }
                 ),
             },
@@ -156,6 +168,58 @@ def refresh_elo_ratings(database_url: str, force: bool = False) -> EloRefreshRes
 
 def ensure_elo_ratings(database_url: str) -> EloRefreshResult:
     return refresh_elo_ratings(database_url, force=False)
+
+
+def fetch_historical_international_matches(
+    url: str = INTERNATIONAL_RESULTS_URL,
+    timeout_seconds: float = 30.0,
+) -> tuple[list[HistoricalMatch], list[int], list[int]]:
+    try:
+        response = httpx.get(url, timeout=timeout_seconds)
+        response.raise_for_status()
+    except httpx.HTTPError as exc:
+        raise RuntimeError("No historical international matches could be fetched") from exc
+
+    matches = parse_international_results_csv(response.text)
+    if not matches:
+        raise RuntimeError("No historical international matches could be parsed")
+
+    fetched_years = sorted({match.date.year for match in matches})
+    return sorted(matches, key=lambda match: (match.date, match.source_match_id)), fetched_years, []
+
+
+def parse_international_results_csv(payload: str) -> list[HistoricalMatch]:
+    matches: list[HistoricalMatch] = []
+    reader = csv.DictReader(StringIO(payload))
+    for index, row in enumerate(reader, start=1):
+        try:
+            match_date = date.fromisoformat(row["date"])
+            home_score = int(row["home_score"])
+            away_score = int(row["away_score"])
+        except (KeyError, TypeError, ValueError):
+            continue
+
+        home_team = row.get("home_team")
+        away_team = row.get("away_team")
+        tournament = row.get("tournament")
+        if not home_team or not away_team or not tournament:
+            continue
+
+        neutral_value = str(row.get("neutral") or "TRUE").strip().upper()
+        matches.append(
+            HistoricalMatch(
+                source_match_id=f"international-results-{match_date.isoformat()}-{index}",
+                date=match_date,
+                tournament=tournament,
+                stage=tournament,
+                home_team=canonical_team_name(home_team),
+                away_team=canonical_team_name(away_team),
+                home_score=home_score,
+                away_score=away_score,
+                neutral=neutral_value == "TRUE",
+            )
+        )
+    return matches
 
 
 def fetch_historical_world_cup_matches(
@@ -217,6 +281,7 @@ def parse_openfootball_historical_payload(year: int, payload: dict[str, Any]) ->
                 away_team=canonical_team_name(str(away_team)),
                 home_score=int(full_time[0]),
                 away_score=int(full_time[1]),
+                neutral=True,
             )
         )
     return matches
@@ -224,13 +289,20 @@ def parse_openfootball_historical_payload(year: int, payload: dict[str, Any]) ->
 
 def compute_elo_ratings(matches: list[HistoricalMatch]) -> dict[str, float]:
     ratings: dict[str, float] = {}
+    last_year: int | None = None
     for match in sorted(matches, key=lambda item: (item.date, item.source_match_id)):
+        if last_year is not None and match.date.year > last_year:
+            ratings = _decay_ratings(ratings, match.date.year - last_year)
+        last_year = match.date.year
+
         home_rating = ratings.get(match.home_team, BASE_ELO)
         away_rating = ratings.get(match.away_team, BASE_ELO)
+        home_advantage = 0.0 if match.neutral else HOME_FIELD_ELO
         actual_home = _actual_score(match.home_score, match.away_score)
-        expected_home = expected_score(home_rating, away_rating)
+        expected_home = expected_score(home_rating + home_advantage, away_rating)
         multiplier = _margin_multiplier(match.home_score, match.away_score)
-        delta = K_FACTOR * multiplier * (actual_home - expected_home)
+        importance = _match_importance_multiplier(match.tournament, match.stage)
+        delta = K_FACTOR * multiplier * importance * (actual_home - expected_home)
         ratings[match.home_team] = home_rating + delta
         ratings[match.away_team] = away_rating - delta
     return ratings
@@ -281,7 +353,7 @@ def rating_source_note(home_team: str, away_team: str, home_elo: float | None, a
         if rating is None
     ]
     if unknown:
-        return f"{RATING_SOURCE} Neutral {BASE_ELO:.0f} Elo fallback used for teams without World Cup history: {', '.join(unknown)}."
+        return f"{RATING_SOURCE} Neutral {BASE_ELO:.0f} Elo fallback used for teams without international match history: {', '.join(unknown)}."
     return RATING_SOURCE
 
 
@@ -312,6 +384,43 @@ def _margin_multiplier(home_score: int, away_score: int) -> float:
     if margin <= 1:
         return 1.0
     return 1.0 + min(log(margin), 1.6) * 0.35
+
+
+def _decay_ratings(ratings: dict[str, float], years_elapsed: int) -> dict[str, float]:
+    retention = (1.0 - ANNUAL_ELO_DECAY) ** years_elapsed
+    return {
+        team: BASE_ELO + (rating - BASE_ELO) * retention
+        for team, rating in ratings.items()
+    }
+
+
+def _match_importance_multiplier(tournament: str, stage: str) -> float:
+    label = f"{tournament} {stage}".lower()
+    if "fifa world cup" in label and "qualification" not in label:
+        return 1.35
+    if "world cup" in label and "qualification" not in label:
+        return 1.35
+    if "qualification" in label or "qualifier" in label:
+        return 1.05
+    if any(
+        competition in label
+        for competition in [
+            "uefa euro",
+            "copa américa",
+            "copa america",
+            "african cup of nations",
+            "afc asian cup",
+            "concacaf championship",
+            "concacaf gold cup",
+            "ofc nations cup",
+        ]
+    ):
+        return 1.15
+    if "nations league" in label or "confederations cup" in label:
+        return 0.95
+    if "friendly" in label:
+        return 0.55
+    return 0.8
 
 
 def _json_dumps(value: Any) -> str:

@@ -60,6 +60,16 @@ class ModelContext(BaseModel):
     explanation: list[str]
 
 
+class MatchPreviewResponse(BaseModel):
+    fixture: str
+    tactical_preview: str
+    key_factors: list[str]
+    upset_scenario: str
+    injury_watch: list[str]
+    source_urls: list[str]
+    confidence: float
+
+
 class PredictionResponse(BaseModel):
     match: MatchSummary
     p_home_win: float

@@ -1,6 +1,6 @@
 "use client";
 
-import { Calculator, Shield, Target } from "lucide-react";
+import { BrainCircuit, Calculator, Shield, Target } from "lucide-react";
 import { useEffect, useMemo, useState } from "react";
 
 import { Button } from "@/components/ui/button";
@@ -26,6 +26,16 @@ type Prediction = {
   model_context: { model_version: string; training_status: string; explanation: string[] };
 };
 
+type MatchPreview = {
+  fixture: string;
+  tactical_preview: string;
+  key_factors: string[];
+  upset_scenario: string;
+  injury_watch: string[];
+  source_urls: string[];
+  confidence: number;
+};
+
 export function LiveOptimizer() {
   const [predictions, setPredictions] = useState<Prediction[]>([]);
   const [selectedMatchId, setSelectedMatchId] = useState<number | null>(null);
@@ -33,6 +43,9 @@ export function LiveOptimizer() {
   const [goalDiff, setGoalDiff] = useState(3);
   const [result, setResult] = useState(2);
   const [optimized, setOptimized] = useState<Prediction | null>(null);
+  const [preview, setPreview] = useState<MatchPreview | null>(null);
+  const [previewLoading, setPreviewLoading] = useState(false);
+  const [previewError, setPreviewError] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
@@ -75,6 +88,8 @@ export function LiveOptimizer() {
     }
     setLoading(true);
     setError(null);
+    setPreview(null);
+    setPreviewError(null);
     try {
       const params = new URLSearchParams({
         exact_score: String(exactScore),
@@ -92,6 +107,27 @@ export function LiveOptimizer() {
       setError(caught instanceof Error ? caught.message : "Failed to recompute");
     } finally {
       setLoading(false);
+    }
+  }
+
+  async function loadAiPreview() {
+    if (selectedMatchId === null) {
+      return;
+    }
+    setPreviewLoading(true);
+    setPreviewError(null);
+    try {
+      const response = await fetch(`${apiBaseUrl()}/api/matches/${selectedMatchId}/preview`, {
+        cache: "no-store"
+      });
+      if (!response.ok) {
+        throw new Error("AI preview unavailable");
+      }
+      setPreview((await response.json()) as MatchPreview);
+    } catch (caught) {
+      setPreviewError(caught instanceof Error ? caught.message : "AI preview failed");
+    } finally {
+      setPreviewLoading(false);
     }
   }
 
@@ -148,9 +184,17 @@ export function LiveOptimizer() {
         <div className="mb-4 flex items-center justify-between gap-3">
           <div>
             <h2 className="text-xl font-semibold text-terminal-ink">{selectedLabel}</h2>
-            <p className="text-sm text-terminal-muted">Live model probabilities and Tipp-Spiel expected value.</p>
+            <p className="text-sm text-terminal-muted">
+              Live model probabilities and Tipp-Spiel EV: average expected points under the scoring rules.
+            </p>
           </div>
-          <Target className="h-5 w-5 text-terminal-cyan" />
+          <div className="flex items-center gap-2">
+            <Button disabled={previewLoading || selectedMatchId === null} onClick={loadAiPreview}>
+              <BrainCircuit className="h-4 w-4" />
+              AI Preview
+            </Button>
+            <Target className="h-5 w-5 text-terminal-cyan" />
+          </div>
         </div>
 
         {optimized ? (
@@ -169,7 +213,8 @@ export function LiveOptimizer() {
               </div>
               <div className="font-mono text-3xl text-terminal-amber">{optimized.recommended_tip.score}</div>
               <p className="mt-2 text-sm text-terminal-muted">
-                {optimized.recommended_tip.expected_points.toFixed(2)} expected points. {optimized.recommended_tip.explanation}
+                EV {optimized.recommended_tip.expected_points.toFixed(2)} means this pick averages that many
+                scoring-rule points across the model&apos;s full score distribution. {optimized.recommended_tip.explanation}
               </p>
             </div>
             <div className="border border-terminal-line bg-terminal-bg p-4 md:col-span-2">
@@ -183,6 +228,43 @@ export function LiveOptimizer() {
                 ))}
               </ul>
             </div>
+            {preview || previewError || previewLoading ? (
+              <div className="border border-terminal-line bg-terminal-bg p-4 md:col-span-2">
+                <div className="mb-2 flex items-center gap-2 font-mono text-xs uppercase text-terminal-muted">
+                  <BrainCircuit className="h-4 w-4 text-terminal-cyan" />
+                  AI Preview
+                </div>
+                {previewLoading ? <p className="text-sm text-terminal-muted">Generating preview...</p> : null}
+                {previewError ? <p className="text-sm text-terminal-red">{previewError}</p> : null}
+                {preview ? (
+                  <div className="space-y-3 text-sm text-terminal-muted">
+                    <p>{preview.tactical_preview}</p>
+                    <ul className="grid gap-2 md:grid-cols-2">
+                      {preview.key_factors.map((factor) => (
+                        <li key={factor} className="border-l border-terminal-line pl-3">
+                          {factor}
+                        </li>
+                      ))}
+                    </ul>
+                    <p>
+                      <span className="text-terminal-ink">Upset scenario:</span> {preview.upset_scenario}
+                    </p>
+                    {preview.injury_watch.length > 0 ? (
+                      <ul className="space-y-2">
+                        {preview.injury_watch.map((item) => (
+                          <li key={item} className="border-l border-terminal-line pl-3">
+                            {item}
+                          </li>
+                        ))}
+                      </ul>
+                    ) : null}
+                    <div className="font-mono text-xs text-terminal-muted">
+                      AI confidence {Math.round(preview.confidence * 100)}%
+                    </div>
+                  </div>
+                ) : null}
+              </div>
+            ) : null}
           </div>
         ) : (
           <div className="text-sm text-terminal-muted">Loading optimizer...</div>

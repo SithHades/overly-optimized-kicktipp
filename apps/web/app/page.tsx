@@ -12,7 +12,7 @@ export default function Home() {
         <section>
           <div className="mb-2 flex items-center justify-between">
             <h2 className="text-lg font-semibold text-terminal-ink">Live Match Board</h2>
-            <Badge tone="cyan">Tipp EV enabled</Badge>
+            <Badge tone="cyan">Tipp EV: expected points</Badge>
           </div>
           <PredictionBoard limit={8} />
         </section>

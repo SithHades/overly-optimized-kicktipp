@@ -90,7 +90,7 @@ def build_prediction_for_fixture(
                 fixture.away_elo,
             ),
             explanation=[
-                "Each team rating is fitted from completed historical World Cup matches.",
+                "Each team rating is fitted from completed historical international matches.",
                 "The rating gap is converted into expected goals for a Poisson score model.",
                 "The 1X2 probabilities come from the full scoreline distribution.",
                 "The recommended Tipp maximizes expected points under the configured scoring rules.",

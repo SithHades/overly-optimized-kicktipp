@@ -7,7 +7,9 @@ export default function MatchesPage() {
     <DashboardShell>
       <div className="mb-3">
         <h2 className="text-xl font-semibold text-terminal-ink">Matches</h2>
-        <p className="text-sm text-terminal-muted">Model probabilities, market comparison, and EV-optimal picks.</p>
+        <p className="text-sm text-terminal-muted">
+          Model probabilities, expected points, and the Tipp with the best average payoff under your scoring rules.
+        </p>
       </div>
       <div className="space-y-6">
         <LiveFixtureTable />

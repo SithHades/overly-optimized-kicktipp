@@ -92,7 +92,7 @@ export function LiveDashboardSummary() {
     },
     {
       label: "Model run",
-      value: winnerTip?.model_version ?? "historical-world-cup-elo-v1",
+      value: winnerTip?.model_version ?? "historical-international-elo-v2",
       subvalue: winnerTip ? new Date(winnerTip.generated_at).toLocaleString() : "not generated",
       icon: BrainCircuit
     },
@@ -162,9 +162,9 @@ export function LiveDashboardSummary() {
           </div>
           <div className="space-y-3 text-sm text-terminal-muted">
             <p>
-              This is a transparent model, not a black box. It fetches completed historical World Cup matches,
-              fits Elo ratings chronologically, converts the rating gap into expected goals, then runs a Poisson
-              score model.
+              This is a transparent model, not a black box. It fetches completed historical international matches,
+              applies recency decay and match-importance weights, converts the rating gap into expected goals, then
+              runs a Poisson score model.
             </p>
             <p>
               {winnerTip
