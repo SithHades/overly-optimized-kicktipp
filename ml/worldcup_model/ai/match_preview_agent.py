@@ -1,3 +1,5 @@
+import os
+
 from pydantic import BaseModel, Field
 
 from worldcup_model.ai.openrouter_client import OpenRouterStructuredClient
@@ -20,14 +22,15 @@ def generate_match_preview(
     client: OpenRouterStructuredClient | None = None,
 ) -> MatchPreview:
     llm = client or OpenRouterStructuredClient()
+    use_web_search = os.environ.get("OPENROUTER_USE_WEB_SEARCH", "").lower() in {"1", "true", "yes"}
     return llm.complete_structured(
         [
             {
                 "role": "system",
                 "content": (
                     "Extract current football tactical and availability context for a World Cup match. "
-                    "Return only valid structured JSON. Include source URLs when web results provide them. "
-                    "Do not invent injuries or lineup facts."
+                    "Return only valid structured JSON. Do not invent injuries or lineup facts. "
+                    "If current availability is unknown, say that explicitly."
                 ),
             },
             {
@@ -36,5 +39,5 @@ def generate_match_preview(
             },
         ],
         MatchPreview,
-        use_web_search=True,
+        use_web_search=use_web_search,
     )

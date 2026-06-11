@@ -1,4 +1,6 @@
 from typing import Annotated
+import logging
+from time import perf_counter
 
 from fastapi import APIRouter, HTTPException, Query
 
@@ -14,6 +16,7 @@ from worldcup_api.services.sample_predictions import build_prediction, build_pre
 from worldcup_model.ai.match_preview_agent import generate_match_preview
 
 router = APIRouter(tags=["predictions"])
+logger = logging.getLogger("uvicorn.error")
 
 
 @router.get("/matches/{match_id}/prediction", response_model=PredictionResponse)
@@ -38,17 +41,23 @@ def get_prediction(
 
 @router.get("/matches/{match_id}/preview", response_model=MatchPreviewResponse)
 def get_match_preview(match_id: int) -> MatchPreviewResponse:
+    started_at = perf_counter()
+    logger.info("AI preview requested for match_id=%s", match_id)
     fixture = find_prediction_fixture(match_id)
     if fixture is None:
+        logger.warning("AI preview match not found match_id=%s", match_id)
         raise HTTPException(status_code=404, detail="Match not found")
 
     try:
         preview = generate_match_preview(fixture.home_team, fixture.away_team)
     except RuntimeError as exc:
+        logger.warning("AI preview failed match_id=%s error=%s", match_id, exc)
         raise HTTPException(status_code=503, detail=str(exc)) from exc
     except Exception as exc:
+        logger.exception("AI preview unexpected failure match_id=%s", match_id)
         raise HTTPException(status_code=502, detail="AI match preview failed") from exc
 
+    logger.info("AI preview completed match_id=%s elapsed=%.2fs", match_id, perf_counter() - started_at)
     return MatchPreviewResponse(**preview.model_dump())
 
 

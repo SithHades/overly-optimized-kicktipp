@@ -24,7 +24,7 @@ Production target:
 - If you keep the bundled services, set strong `POSTGRES_PASSWORD` and keep the `postgres-data` volume backed up.
 - Set `NEXT_PUBLIC_API_BASE_URL` to the public API URL if the frontend starts calling the API from the browser.
 - Set `CORS_ALLOW_ORIGINS` to the public frontend origin when API calls run from the browser.
-- Set `OPENROUTER_API_KEY` and `OPENROUTER_MODEL` on the API service for AI previews. These must be runtime environment variables, not only build arguments.
+- Set `OPENROUTER_API_KEY` and `OPENROUTER_MODEL` on the API service for AI previews. These must be runtime environment variables, not only build arguments. `OPENROUTER_USE_WEB_SEARCH=false` is the default because provider-side web search can be slow or unsupported for some free models.
 - Set `FOOTBALL_DATA_API_TOKEN` and `INGEST_ADMIN_TOKEN` to random/secret values, then trigger live fixture ingest with:
 
 ```bash
