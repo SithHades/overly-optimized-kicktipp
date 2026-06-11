@@ -8,6 +8,7 @@ from sqlalchemy.exc import SQLAlchemyError
 
 from worldcup_api.schemas.predictions import MatchSummary, TeamSide
 from worldcup_api.services.sample_data import load_sample_fixtures
+from worldcup_api.services.team_strength import estimate_lambdas
 from worldcup_model.data.live.snapshot import read_snapshot
 
 
@@ -25,25 +26,6 @@ class PredictionFixture:
     status: str
     lambda_home: float
     lambda_away: float
-
-
-TEAM_ATTACK_PRIORS: dict[str, tuple[float, float]] = {
-    "Argentina": (1.85, 0.82),
-    "Brazil": (1.9, 0.8),
-    "France": (1.82, 0.85),
-    "Spain": (1.72, 0.9),
-    "England": (1.7, 0.92),
-    "Portugal": (1.68, 0.96),
-    "Germany": (1.64, 1.02),
-    "Netherlands": (1.62, 1.02),
-    "Belgium": (1.58, 1.08),
-    "Uruguay": (1.52, 1.04),
-    "Croatia": (1.44, 1.1),
-    "Mexico": (1.36, 1.16),
-    "USA": (1.34, 1.17),
-    "Japan": (1.32, 1.15),
-    "Morocco": (1.3, 1.08),
-}
 
 
 def load_prediction_fixtures() -> list[PredictionFixture]:
@@ -101,7 +83,7 @@ def _load_live_fixtures() -> list[PredictionFixture]:
     result = read_snapshot(snapshot_path)
     fixtures: list[PredictionFixture] = []
     for index, fixture in enumerate(result.fixtures, start=1):
-        lambda_home, lambda_away = _estimate_lambdas(fixture.home_team, fixture.away_team)
+        lambda_home, lambda_away = estimate_lambdas(fixture.home_team, fixture.away_team)
         fixtures.append(
             PredictionFixture(
                 id=index,
@@ -153,7 +135,7 @@ def _load_database_fixtures() -> list[PredictionFixture]:
             ).mappings()
             fixtures: list[PredictionFixture] = []
             for row in rows:
-                lambda_home, lambda_away = _estimate_lambdas(row["home_team"], row["away_team"])
+                lambda_home, lambda_away = estimate_lambdas(row["home_team"], row["away_team"])
                 fixtures.append(
                     PredictionFixture(
                         id=row["id"],
@@ -173,14 +155,6 @@ def _load_database_fixtures() -> list[PredictionFixture]:
             return fixtures
     except SQLAlchemyError:
         return []
-
-
-def _estimate_lambdas(home_team: str, away_team: str) -> tuple[float, float]:
-    home_attack, home_defense = TEAM_ATTACK_PRIORS.get(home_team, (1.2, 1.2))
-    away_attack, away_defense = TEAM_ATTACK_PRIORS.get(away_team, (1.2, 1.2))
-    lambda_home = max(0.25, (home_attack + away_defense) / 2)
-    lambda_away = max(0.25, (away_attack + home_defense) / 2)
-    return lambda_home, lambda_away
 
 
 def _live_fixture_snapshot_path(start: Path) -> Path:

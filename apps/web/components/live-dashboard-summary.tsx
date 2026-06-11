@@ -1,6 +1,6 @@
 "use client";
 
-import { AlertTriangle, BrainCircuit, Database, Trophy } from "lucide-react";
+import { AlertTriangle, BrainCircuit, Database, Info, Trophy } from "lucide-react";
 import { useEffect, useMemo, useState } from "react";
 
 import { Badge } from "@/components/ui/badge";
@@ -134,25 +134,49 @@ export function LiveDashboardSummary() {
         })}
       </div>
 
-      <section className="border border-terminal-line bg-terminal-panel p-4">
-        <h2 className="text-lg font-semibold text-terminal-ink">Title Contenders</h2>
-        <div className="mt-4 space-y-4">
-          {titleRows.length === 0 ? (
-            <div className="text-sm text-terminal-muted">Run fixture ingest to generate contender projections.</div>
-          ) : null}
-          {titleRows.map((team) => (
-            <div key={team.team}>
-              <div className="mb-1 flex justify-between text-sm">
-                <span>{team.team}</span>
-                <span className="font-mono text-terminal-amber">{team.score.toFixed(1)}</span>
+      <div className="mt-4 grid gap-4 lg:grid-cols-[1fr_1.15fr]">
+        <section className="border border-terminal-line bg-terminal-panel p-4">
+          <h2 className="text-lg font-semibold text-terminal-ink">Title Contenders</h2>
+          <div className="mt-4 space-y-4">
+            {titleRows.length === 0 ? (
+              <div className="text-sm text-terminal-muted">Run fixture ingest to generate contender projections.</div>
+            ) : null}
+            {titleRows.map((team) => (
+              <div key={team.team}>
+                <div className="mb-1 flex justify-between text-sm">
+                  <span>{team.team}</span>
+                  <span className="font-mono text-terminal-amber">{team.score.toFixed(1)}</span>
+                </div>
+                <div className="h-2 border border-terminal-line bg-terminal-bg">
+                  <div className="h-full bg-terminal-green" style={{ width: `${team.width}%` }} />
+                </div>
               </div>
-              <div className="h-2 border border-terminal-line bg-terminal-bg">
-                <div className="h-full bg-terminal-green" style={{ width: `${team.width}%` }} />
-              </div>
-            </div>
-          ))}
-        </div>
-      </section>
+            ))}
+          </div>
+        </section>
+
+        <section className="border border-terminal-line bg-terminal-panel p-4">
+          <div className="mb-3 flex items-center gap-2">
+            <Info className="h-4 w-4 text-terminal-cyan" />
+            <h2 className="text-lg font-semibold text-terminal-ink">Why This Output?</h2>
+          </div>
+          <div className="space-y-3 text-sm text-terminal-muted">
+            <p>
+              This is a transparent baseline, not a trained black-box model. It starts from model Elo-style
+              team ratings, converts the rating gap into expected goals, then runs a Poisson score model.
+            </p>
+            <p>
+              {winnerTip
+                ? `${stringField(winnerTip.answer.team) ?? "The leader"} is on top because its seeded rating and projected bracket score currently rank first. This should be treated as a baseline prior, not a guarantee.`
+                : "The tournament winner card appears after fixture ingest creates tournament projections."}
+            </p>
+            <p>
+              Low confidence on individual games is normal: football has high draw/upset probability, and a
+              40% favorite is still more likely not to win than to win.
+            </p>
+          </div>
+        </section>
+      </div>
     </>
   );
 }

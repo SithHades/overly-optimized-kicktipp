@@ -1,10 +1,22 @@
 from worldcup_api.schemas.predictions import (
+    ModelContext,
     PredictionResponse,
+    PredictionConfidence,
     RecommendedTip,
     ScoreProbability,
     ScoringRulesSchema,
+    TeamRating,
 )
-from worldcup_api.services.fixtures import find_prediction_fixture, to_match_summary
+from worldcup_api.services.fixtures import PredictionFixture, find_prediction_fixture, load_prediction_fixtures, to_match_summary
+from worldcup_api.services.team_strength import (
+    MODEL_TRAINING_STATUS,
+    MODEL_VERSION,
+    model_elo,
+    rating_known,
+    rating_source_note,
+    rating_tier,
+    strength_score,
+)
 from worldcup_model.models.poisson import outcome_probabilities, score_distribution, top_scores
 from worldcup_model.models.tippspiel import ScoringRules, expected_tippspiel_points
 
@@ -17,6 +29,21 @@ def build_prediction(
     if fixture is None:
         return None
 
+    return build_prediction_for_fixture(fixture, scoring_rules)
+
+
+def build_predictions(scoring_rules: ScoringRulesSchema) -> list[PredictionResponse]:
+    return [
+        build_prediction_for_fixture(fixture, scoring_rules)
+        for fixture in load_prediction_fixtures()
+        if fixture.home_team != "TBD" and fixture.away_team != "TBD"
+    ]
+
+
+def build_prediction_for_fixture(
+    fixture: PredictionFixture,
+    scoring_rules: ScoringRulesSchema,
+) -> PredictionResponse:
     distribution = score_distribution(fixture.lambda_home, fixture.lambda_away, max_goals=7)
     outcomes = outcome_probabilities(distribution)
     rules = ScoringRules(
@@ -25,6 +52,9 @@ def build_prediction(
         exact_score=scoring_rules.exact_score,
     )
     best_tip = expected_tippspiel_points(distribution, rules, max_pick_goals=5)
+    confidence = _prediction_confidence(outcomes.home_win, outcomes.draw, outcomes.away_win)
+    home_rating = _team_rating(fixture.home_team)
+    away_rating = _team_rating(fixture.away_team)
 
     return PredictionResponse(
         match=to_match_summary(fixture),
@@ -45,8 +75,56 @@ def build_prediction(
                 "not just the single most likely scoreline."
             ),
         ),
+        home_rating=home_rating,
+        away_rating=away_rating,
+        rating_delta=home_rating.model_elo - away_rating.model_elo,
+        confidence=confidence,
+        model_context=ModelContext(
+            model_version=MODEL_VERSION,
+            data_source=f"{fixture.source} fixtures saved in Postgres, then scored on demand.",
+            training_status=MODEL_TRAINING_STATUS,
+            rating_source=rating_source_note(fixture.home_team, fixture.away_team),
+            explanation=[
+                "Each team starts with a seeded model Elo-style rating.",
+                "The rating gap is converted into expected goals for a Poisson score model.",
+                "The 1X2 probabilities come from the full scoreline distribution.",
+                "The recommended Tipp maximizes expected points under the configured scoring rules.",
+            ],
+        ),
         model_notes=[
-            f"Fixture source: {fixture.source}. Lambdas are baseline priors until historical training is wired.",
-            "Tipp recommendation is deterministic and scoring-rule aware.",
+            f"Fixture source: {fixture.source}.",
+            f"Model Elo: {fixture.home_team} {home_rating.model_elo}, {fixture.away_team} {away_rating.model_elo}.",
+            MODEL_TRAINING_STATUS,
         ],
+    )
+
+
+def _team_rating(team: str) -> TeamRating:
+    return TeamRating(
+        team=team,
+        model_elo=model_elo(team),
+        strength_score=strength_score(team),
+        tier=rating_tier(team),
+        known_rating=rating_known(team),
+    )
+
+
+def _prediction_confidence(home_win: float, draw: float, away_win: float) -> PredictionConfidence:
+    strongest = max(home_win, draw, away_win)
+    margin = strongest - sorted([home_win, draw, away_win], reverse=True)[1]
+    score = min(1.0, max(0.0, strongest * 0.7 + margin * 1.2))
+    if strongest >= 0.58 or margin >= 0.2:
+        label = "High"
+    elif strongest >= 0.44 or margin >= 0.1:
+        label = "Medium"
+    else:
+        label = "Low"
+
+    return PredictionConfidence(
+        label=label,
+        score=score,
+        reason=(
+            f"Best outcome is {strongest:.0%}; gap to the next outcome is {margin:.0%}. "
+            "Football scorelines are noisy, so close 1X2 markets should remain low confidence."
+        ),
     )

@@ -13,7 +13,7 @@ export default function MatchesPage() {
         <LiveFixtureTable />
         <section>
           <h2 className="mb-2 text-lg font-semibold text-terminal-ink">Live Prediction Preview</h2>
-          <PredictionBoard limit={16} />
+          <PredictionBoard limit={null} showControls />
         </section>
       </div>
     </DashboardShell>

@@ -38,6 +38,28 @@ class RecommendedTip(BaseModel):
     explanation: str
 
 
+class TeamRating(BaseModel):
+    team: str
+    model_elo: int
+    strength_score: float
+    tier: str
+    known_rating: bool
+
+
+class PredictionConfidence(BaseModel):
+    label: str
+    score: float
+    reason: str
+
+
+class ModelContext(BaseModel):
+    model_version: str
+    data_source: str
+    training_status: str
+    rating_source: str
+    explanation: list[str]
+
+
 class PredictionResponse(BaseModel):
     match: MatchSummary
     p_home_win: float
@@ -47,8 +69,17 @@ class PredictionResponse(BaseModel):
     lambda_away: float
     most_likely_scores: list[ScoreProbability]
     recommended_tip: RecommendedTip
+    home_rating: TeamRating
+    away_rating: TeamRating
+    rating_delta: int
+    confidence: PredictionConfidence
+    model_context: ModelContext
     model_notes: list[str]
 
 
 class MatchListResponse(BaseModel):
     matches: list[MatchSummary]
+
+
+class PredictionListResponse(BaseModel):
+    predictions: list[PredictionResponse]

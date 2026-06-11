@@ -8,6 +8,14 @@ export type PredictionRow = {
   bestTip: string;
   mostLikelyScore: string;
   confidence: "Low" | "Medium" | "High";
+  confidenceScore?: number;
+  confidenceReason?: string;
+  homeElo?: number;
+  awayElo?: number;
+  ratingDelta?: number;
+  expectedGoals?: string;
+  modelVersion?: string;
+  explanation?: string[];
   disagreement: number;
 };
 

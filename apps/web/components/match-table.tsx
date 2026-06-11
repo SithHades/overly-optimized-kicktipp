@@ -17,9 +17,11 @@ export function MatchTable({ rows }: { rows: PredictionRow[] }) {
             <th className="border-b border-terminal-line px-3 py-2">Date</th>
             <th className="border-b border-terminal-line px-3 py-2">Match</th>
             <th className="border-b border-terminal-line px-3 py-2">Model 1X2</th>
+            <th className="border-b border-terminal-line px-3 py-2">Model Elo</th>
             <th className="border-b border-terminal-line px-3 py-2">Best Tipp</th>
             <th className="border-b border-terminal-line px-3 py-2">Most Likely</th>
             <th className="border-b border-terminal-line px-3 py-2">Confidence</th>
+            <th className="border-b border-terminal-line px-3 py-2">Why</th>
           </tr>
         </thead>
         <tbody>
@@ -35,12 +37,34 @@ export function MatchTable({ rows }: { rows: PredictionRow[] }) {
               <td className="border-b border-terminal-line px-3 py-3">
                 <ProbabilityStrip probabilities={row.model} />
               </td>
+              <td className="whitespace-nowrap border-b border-terminal-line px-3 py-3 font-mono text-xs text-terminal-muted">
+                {row.homeElo && row.awayElo ? (
+                  <>
+                    {row.homeElo} - {row.awayElo}
+                    <div className="text-terminal-amber">
+                      {row.ratingDelta && row.ratingDelta > 0 ? "+" : ""}
+                      {row.ratingDelta ?? 0}
+                    </div>
+                  </>
+                ) : (
+                  "-"
+                )}
+              </td>
               <td className="border-b border-terminal-line px-3 py-3 font-mono text-terminal-amber">{row.bestTip}</td>
               <td className="border-b border-terminal-line px-3 py-3 font-mono text-terminal-muted">
                 {row.mostLikelyScore}
               </td>
               <td className="border-b border-terminal-line px-3 py-3">
-                <Badge tone={confidenceTone[row.confidence]}>{row.confidence}</Badge>
+                <div className="space-y-1">
+                  <Badge tone={confidenceTone[row.confidence]}>{row.confidence}</Badge>
+                  {row.confidenceScore !== undefined ? (
+                    <div className="font-mono text-xs text-terminal-muted">{Math.round(row.confidenceScore * 100)}%</div>
+                  ) : null}
+                </div>
+              </td>
+              <td className="min-w-64 border-b border-terminal-line px-3 py-3 text-xs text-terminal-muted">
+                <div>{row.confidenceReason ?? "Baseline model probability spread."}</div>
+                {row.expectedGoals ? <div className="mt-1 font-mono text-terminal-amber">xG {row.expectedGoals}</div> : null}
               </td>
             </tr>
           ))}

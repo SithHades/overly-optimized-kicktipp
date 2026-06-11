@@ -8,62 +8,9 @@ from typing import Any
 
 from sqlalchemy import create_engine, text
 
-from worldcup_api.services.fixtures import _estimate_lambdas
+from worldcup_api.services.team_strength import MODEL_VERSION, estimate_lambdas, strength_score
 from worldcup_model.data.live.postgres import _ensure_live_schema
 from worldcup_model.models.poisson import outcome_probabilities, score_distribution
-
-MODEL_VERSION = "baseline-strength-v1"
-
-
-TEAM_STRENGTH: dict[str, float] = {
-    "Argentina": 97,
-    "France": 96,
-    "Brazil": 95,
-    "England": 94,
-    "Spain": 93,
-    "Portugal": 92,
-    "Netherlands": 90,
-    "Germany": 89,
-    "Belgium": 87,
-    "Uruguay": 86,
-    "Croatia": 85,
-    "Italy": 84,
-    "Morocco": 83,
-    "Colombia": 82,
-    "Japan": 81,
-    "Mexico": 80,
-    "Switzerland": 79,
-    "USA": 78,
-    "Denmark": 78,
-    "Senegal": 77,
-    "Austria": 76,
-    "South Korea": 75,
-    "Ecuador": 75,
-    "Australia": 73,
-    "Czech Republic": 73,
-    "Turkey": 73,
-    "Canada": 72,
-    "Scotland": 72,
-    "South Africa": 70,
-    "Ghana": 70,
-    "Algeria": 70,
-    "Tunisia": 69,
-    "Egypt": 69,
-    "Qatar": 68,
-    "Saudi Arabia": 68,
-    "Iran": 68,
-    "Norway": 68,
-    "Bosnia & Herzegovina": 67,
-    "Paraguay": 67,
-    "Ivory Coast": 67,
-    "Uzbekistan": 66,
-    "New Zealand": 63,
-    "Panama": 62,
-    "Haiti": 60,
-    "Cape Verde": 60,
-    "Curaçao": 58,
-    "Jordan": 58,
-}
 
 TOP_SCORER_CANDIDATES: list[dict[str, Any]] = [
     {"player": "Kylian Mbappe", "team": "France", "role_score": 1.0},
@@ -248,7 +195,7 @@ def _project_group_winners(matches: list[DbMatch]) -> dict[str, dict[str, Any]]:
         if match.status == "finished" and match.home_score is not None and match.away_score is not None:
             home_points, away_points = _actual_points(match.home_score, match.away_score)
         else:
-            lambda_home, lambda_away = _estimate_lambdas(match.home_team, match.away_team)
+            lambda_home, lambda_away = estimate_lambdas(match.home_team, match.away_team)
             outcomes = outcome_probabilities(score_distribution(lambda_home, lambda_away))
             home_points = 3 * outcomes.home_win + outcomes.draw
             away_points = 3 * outcomes.away_win + outcomes.draw
@@ -407,7 +354,7 @@ def _json_dumps(value: Any) -> str:
 
 
 def _strength(team: str) -> float:
-    return TEAM_STRENGTH.get(team, 64.0)
+    return strength_score(team)
 
 
 def _is_group_team(team: str) -> bool:

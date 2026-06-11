@@ -1,13 +1,40 @@
-import { Activity, BarChart3, GitBranch, LineChart } from "lucide-react";
+import { Activity, BarChart3, Database, GitBranch, LineChart, RefreshCw } from "lucide-react";
 
 import { DashboardShell } from "@/components/dashboard-shell";
 import { Badge } from "@/components/ui/badge";
 
-const rows = [
-  ["Elo baseline", "0.621", "0.214", "active"],
-  ["Poisson score", "0.608", "0.207", "active"],
-  ["Market blend", "pending", "pending", "planned"],
-  ["Bayesian hierarchy", "pending", "pending", "later"]
+const modelRows = [
+  {
+    name: "Model Elo prior",
+    status: "active",
+    role: "Ranks team strength before kickoff",
+    caveat: "Seeded manually; not learned from match history yet"
+  },
+  {
+    name: "Poisson score model",
+    status: "active",
+    role: "Turns expected goals into scoreline probabilities",
+    caveat: "Uses baseline lambdas from rating gaps"
+  },
+  {
+    name: "Tipp EV optimizer",
+    status: "active",
+    role: "Chooses the score with best expected scoring-rule points",
+    caveat: "Optimizes game rules, not emotional plausibility"
+  },
+  {
+    name: "Historical calibration",
+    status: "planned",
+    role: "Backtests log loss, Brier score, and calibration buckets",
+    caveat: "Needs historical international fixture dataset"
+  }
+];
+
+const dataLineage = [
+  "Fixtures and match status come from football-data.org via the ingest endpoint.",
+  "Teams are upserted into Postgres and predictions are generated on request.",
+  "Tournament tips are regenerated after ingest and stored as pre_tournament/current phases.",
+  "No automatic retraining exists yet; model parameters change only when code or seeded priors change."
 ];
 
 export default function ModelLabPage() {
@@ -17,25 +44,26 @@ export default function ModelLabPage() {
         <section className="border border-terminal-line bg-terminal-panel p-4">
           <div className="mb-4 flex items-center gap-2">
             <GitBranch className="h-4 w-4 text-terminal-cyan" />
-            <h2 className="text-xl font-semibold text-terminal-ink">Model Runs</h2>
+            <h2 className="text-xl font-semibold text-terminal-ink">Model Stack</h2>
           </div>
           <table className="w-full border-collapse text-sm">
             <thead className="font-mono text-xs uppercase text-terminal-muted">
               <tr>
-                <th className="border-b border-terminal-line py-2 text-left">Model</th>
-                <th className="border-b border-terminal-line py-2 text-left">Log loss</th>
-                <th className="border-b border-terminal-line py-2 text-left">Brier</th>
+                <th className="border-b border-terminal-line py-2 text-left">Component</th>
+                <th className="border-b border-terminal-line py-2 text-left">Role</th>
                 <th className="border-b border-terminal-line py-2 text-left">State</th>
               </tr>
             </thead>
             <tbody>
-              {rows.map(([name, logLoss, brier, state]) => (
-                <tr key={name}>
-                  <td className="border-b border-terminal-line py-3">{name}</td>
-                  <td className="border-b border-terminal-line py-3 font-mono">{logLoss}</td>
-                  <td className="border-b border-terminal-line py-3 font-mono">{brier}</td>
+              {modelRows.map((row) => (
+                <tr key={row.name}>
                   <td className="border-b border-terminal-line py-3">
-                    <Badge tone={state === "active" ? "green" : "amber"}>{state}</Badge>
+                    <div className="font-medium text-terminal-ink">{row.name}</div>
+                    <div className="text-xs text-terminal-muted">{row.caveat}</div>
+                  </td>
+                  <td className="border-b border-terminal-line py-3 text-terminal-muted">{row.role}</td>
+                  <td className="border-b border-terminal-line py-3">
+                    <Badge tone={row.status === "active" ? "green" : "amber"}>{row.status}</Badge>
                   </td>
                 </tr>
               ))}
@@ -46,28 +74,60 @@ export default function ModelLabPage() {
         <section className="grid gap-4">
           <div className="border border-terminal-line bg-terminal-panel p-4">
             <div className="mb-3 flex items-center gap-2">
-              <LineChart className="h-4 w-4 text-terminal-cyan" />
-              <h2 className="text-lg font-semibold">Calibration</h2>
+              <Database className="h-4 w-4 text-terminal-cyan" />
+              <h2 className="text-lg font-semibold">Data Lineage</h2>
             </div>
-            <div className="grid h-48 place-items-center border border-dashed border-terminal-line font-mono text-xs text-terminal-muted">
-              Recharts calibration chart placeholder
-            </div>
+            <ul className="space-y-2 text-sm text-terminal-muted">
+              {dataLineage.map((item) => (
+                <li key={item} className="border-l border-terminal-line pl-3">
+                  {item}
+                </li>
+              ))}
+            </ul>
           </div>
+
           <div className="border border-terminal-line bg-terminal-panel p-4">
             <div className="mb-3 flex items-center gap-2">
-              <BarChart3 className="h-4 w-4 text-terminal-cyan" />
-              <h2 className="text-lg font-semibold">Feature Importance</h2>
+              <LineChart className="h-4 w-4 text-terminal-cyan" />
+              <h2 className="text-lg font-semibold">Calibration Status</h2>
             </div>
-            <div className="grid h-32 place-items-center border border-dashed border-terminal-line font-mono text-xs text-terminal-muted">
-              Elo diff, market implied p, rest days, squad strength
+            <p className="text-sm text-terminal-muted">
+              Calibration is not proven yet. The app should treat confidence labels as probability-spread
+              diagnostics until historical backtests are wired in.
+            </p>
+          </div>
+
+          <div className="grid gap-4 md:grid-cols-2">
+            <div className="border border-terminal-line bg-terminal-panel p-4">
+              <div className="mb-3 flex items-center gap-2">
+                <RefreshCw className="h-4 w-4 text-terminal-cyan" />
+                <h2 className="text-lg font-semibold">Retraining</h2>
+              </div>
+              <p className="text-sm text-terminal-muted">
+                There is no scheduled retraining job yet. Fixture ingest refreshes data and tournament tips only.
+              </p>
+            </div>
+            <div className="border border-terminal-line bg-terminal-panel p-4">
+              <div className="mb-3 flex items-center gap-2">
+                <BarChart3 className="h-4 w-4 text-terminal-cyan" />
+                <h2 className="text-lg font-semibold">Next Upgrade</h2>
+              </div>
+              <p className="text-sm text-terminal-muted">
+                Add historical match results, fit ratings, then publish log loss, Brier score, and calibration
+                curves per model version.
+              </p>
             </div>
           </div>
+
           <div className="border border-terminal-line bg-terminal-panel p-4">
             <div className="mb-3 flex items-center gap-2">
               <Activity className="h-4 w-4 text-terminal-cyan" />
-              <h2 className="text-lg font-semibold">Data Audit</h2>
+              <h2 className="text-lg font-semibold">Interpretation</h2>
             </div>
-            <p className="text-sm text-terminal-muted">No anomalies in sample data.</p>
+            <p className="text-sm text-terminal-muted">
+              A “Low” confidence label does not mean the model is broken. It means the top 1X2 outcome is close
+              to the alternatives, which is common in football.
+            </p>
           </div>
         </section>
       </div>

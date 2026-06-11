@@ -18,25 +18,36 @@ type ApiMatch = {
   status: string;
 };
 
-type MatchListResponse = {
-  matches: ApiMatch[];
-};
-
 type PredictionResponse = {
   match: ApiMatch;
   p_home_win: number;
   p_draw: number;
   p_away_win: number;
+  lambda_home: number;
+  lambda_away: number;
   most_likely_scores: { score: string; p: number }[];
   recommended_tip: { score: string; expected_points: number; explanation: string };
+  home_rating: { model_elo: number; strength_score: number; tier: string; known_rating: boolean };
+  away_rating: { model_elo: number; strength_score: number; tier: string; known_rating: boolean };
+  rating_delta: number;
+  confidence: { label: "Low" | "Medium" | "High"; score: number; reason: string };
+  model_context: {
+    model_version: string;
+    data_source: string;
+    training_status: string;
+    rating_source: string;
+    explanation: string[];
+  };
 };
 
 type PredictionBoardProps = {
-  limit?: number;
+  limit?: number | null;
+  showControls?: boolean;
 };
 
-export function PredictionBoard({ limit = 12 }: PredictionBoardProps) {
+export function PredictionBoard({ limit = 12, showControls = false }: PredictionBoardProps) {
   const [rows, setRows] = useState<PredictionRow[]>([]);
+  const [stageFilter, setStageFilter] = useState("all");
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
@@ -49,27 +60,15 @@ export function PredictionBoard({ limit = 12 }: PredictionBoardProps) {
 
       const baseUrl = apiBaseUrl();
       try {
-        const matchesResponse = await fetch(`${baseUrl}/api/matches`, { cache: "no-store" });
-        if (!matchesResponse.ok) {
-          throw new Error("Match feed unavailable");
+        const predictionsResponse = await fetch(`${baseUrl}/api/predictions`, { cache: "no-store" });
+        if (!predictionsResponse.ok) {
+          throw new Error("Prediction feed unavailable");
         }
 
-        const matchesPayload = (await matchesResponse.json()) as MatchListResponse;
-        const candidates = matchesPayload.matches
-          .filter((match) => match.home_team.name !== "TBD" && match.away_team.name !== "TBD")
-          .slice(0, limit);
-
-        const predictionPayloads = await Promise.all(
-          candidates.map(async (match) => {
-            const response = await fetch(`${baseUrl}/api/matches/${match.id}/prediction`, {
-              cache: "no-store"
-            });
-            if (!response.ok) {
-              throw new Error(`Prediction unavailable for match ${match.id}`);
-            }
-            return (await response.json()) as PredictionResponse;
-          })
-        );
+        const predictionsPayload = (await predictionsResponse.json()) as { predictions: PredictionResponse[] };
+        const predictionPayloads = limit === null
+          ? predictionsPayload.predictions
+          : predictionsPayload.predictions.slice(0, limit);
 
         if (!cancelled) {
           setRows(predictionPayloads.map(toPredictionRow));
@@ -91,6 +90,15 @@ export function PredictionBoard({ limit = 12 }: PredictionBoardProps) {
       cancelled = true;
     };
   }, [limit]);
+
+  const stageOptions = useMemo(
+    () => ["all", ...Array.from(new Set(rows.map((row) => row.stage))).filter(Boolean)],
+    [rows]
+  );
+  const visibleRows = useMemo(
+    () => rows.filter((row) => stageFilter === "all" || row.stage === stageFilter),
+    [rows, stageFilter]
+  );
 
   const content = useMemo(() => {
     if (loading) {
@@ -117,8 +125,33 @@ export function PredictionBoard({ limit = 12 }: PredictionBoardProps) {
       );
     }
 
-    return <MatchTable rows={rows} />;
-  }, [error, loading, rows]);
+    return (
+      <div className="space-y-3">
+        {showControls ? (
+          <div className="flex flex-wrap items-center justify-between gap-2 border border-terminal-line bg-terminal-panel p-3">
+            <div className="text-sm text-terminal-muted">
+              Showing {visibleRows.length} of {rows.length} predicted matches.
+            </div>
+            <label className="flex items-center gap-2 text-sm text-terminal-muted">
+              Stage
+              <select
+                className="h-9 border border-terminal-line bg-terminal-bg px-2 font-mono text-terminal-ink"
+                value={stageFilter}
+                onChange={(event) => setStageFilter(event.target.value)}
+              >
+                {stageOptions.map((stage) => (
+                  <option key={stage} value={stage}>
+                    {stage === "all" ? "All stages" : stage}
+                  </option>
+                ))}
+              </select>
+            </label>
+          </div>
+        ) : null}
+        <MatchTable rows={visibleRows} />
+      </div>
+    );
+  }, [error, loading, rows, showControls, stageFilter, stageOptions, visibleRows]);
 
   return content;
 }
@@ -130,7 +163,6 @@ function toPredictionRow(prediction: PredictionResponse): PredictionRow {
     prediction.p_draw,
     prediction.p_away_win
   ];
-  const strongestOutcome = Math.max(...model);
 
   return {
     id: match.id,
@@ -141,7 +173,15 @@ function toPredictionRow(prediction: PredictionResponse): PredictionRow {
     market: model,
     bestTip: `${prediction.recommended_tip.score} (${prediction.recommended_tip.expected_points.toFixed(2)} EV)`,
     mostLikelyScore: prediction.most_likely_scores[0]?.score ?? "-",
-    confidence: strongestOutcome >= 0.5 ? "High" : strongestOutcome >= 0.4 ? "Medium" : "Low",
+    confidence: prediction.confidence.label,
+    confidenceScore: prediction.confidence.score,
+    confidenceReason: prediction.confidence.reason,
+    homeElo: prediction.home_rating.model_elo,
+    awayElo: prediction.away_rating.model_elo,
+    ratingDelta: prediction.rating_delta,
+    expectedGoals: `${prediction.lambda_home.toFixed(2)}-${prediction.lambda_away.toFixed(2)}`,
+    modelVersion: prediction.model_context.model_version,
+    explanation: prediction.model_context.explanation,
     disagreement: 0
   };
 }
