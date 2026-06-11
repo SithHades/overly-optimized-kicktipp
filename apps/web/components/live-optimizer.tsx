@@ -114,19 +114,30 @@ export function LiveOptimizer() {
     if (selectedMatchId === null) {
       return;
     }
+    const previewUrl = `${apiBaseUrl()}/api/matches/${selectedMatchId}/preview`;
+    const controller = new AbortController();
+    const timeout = window.setTimeout(() => controller.abort(), 35000);
+
     setPreviewLoading(true);
     setPreviewError(null);
     try {
-      const response = await fetch(`${apiBaseUrl()}/api/matches/${selectedMatchId}/preview`, {
-        cache: "no-store"
+      const response = await fetch(previewUrl, {
+        cache: "no-store",
+        signal: controller.signal
       });
       if (!response.ok) {
-        throw new Error("AI preview unavailable");
+        const detail = await readErrorDetail(response);
+        throw new Error(detail ? `AI preview unavailable: ${detail}` : `AI preview unavailable (${response.status})`);
       }
       setPreview((await response.json()) as MatchPreview);
     } catch (caught) {
-      setPreviewError(caught instanceof Error ? caught.message : "AI preview failed");
+      if (caught instanceof DOMException && caught.name === "AbortError") {
+        setPreviewError("AI preview timed out after 35 seconds. Check the API container logs and OpenRouter settings.");
+      } else {
+        setPreviewError(caught instanceof Error ? caught.message : "AI preview failed");
+      }
     } finally {
+      window.clearTimeout(timeout);
       setPreviewLoading(false);
     }
   }
@@ -276,4 +287,13 @@ export function LiveOptimizer() {
 
 function apiBaseUrl() {
   return (process.env.NEXT_PUBLIC_API_BASE_URL ?? "").replace(/\/$/, "");
+}
+
+async function readErrorDetail(response: Response) {
+  try {
+    const payload = (await response.json()) as { detail?: unknown };
+    return typeof payload.detail === "string" ? payload.detail : null;
+  } catch {
+    return null;
+  }
 }

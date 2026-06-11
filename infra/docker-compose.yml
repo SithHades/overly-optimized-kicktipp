@@ -32,6 +32,8 @@ services:
       INGEST_ADMIN_TOKEN: ${INGEST_ADMIN_TOKEN:-}
       LIVE_FIXTURE_PROVIDER: ${LIVE_FIXTURE_PROVIDER:-football-data}
       FOOTBALL_DATA_API_TOKEN: ${FOOTBALL_DATA_API_TOKEN:-}
+      OPENROUTER_API_KEY: ${OPENROUTER_API_KEY:-}
+      OPENROUTER_MODEL: ${OPENROUTER_MODEL:-openai/gpt-4.1-mini}
     expose:
       - "8000"
     depends_on:
