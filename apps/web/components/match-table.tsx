@@ -68,6 +68,7 @@ export function MatchTable({ rows }: { rows: PredictionRow[] }) {
                     <ArrowUpRight className="h-3.5 w-3.5" />
                   </Link>
                   <div className="font-mono text-xs text-terminal-muted">{row.stage}</div>
+                  {row.venue ? <div className="mt-1 text-xs text-terminal-muted">{row.venue}</div> : null}
                 </td>
                 <td className="border-b border-terminal-line px-3 py-3">
                   <ProbabilityStrip probabilities={row.model} />

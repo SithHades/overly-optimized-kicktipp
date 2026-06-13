@@ -9,9 +9,10 @@ import { apiBaseUrl, formatKickoff, type PredictionResponse } from "@/lib/predic
 type PredictionBoardProps = {
   limit?: number | null;
   showControls?: boolean;
+  scope?: "all" | "upcoming";
 };
 
-export function PredictionBoard({ limit = 12, showControls = false }: PredictionBoardProps) {
+export function PredictionBoard({ limit = 12, showControls = false, scope = "all" }: PredictionBoardProps) {
   const [rows, setRows] = useState<PredictionRow[]>([]);
   const [stageFilter, setStageFilter] = useState("all");
   const [loading, setLoading] = useState(true);
@@ -32,12 +33,11 @@ export function PredictionBoard({ limit = 12, showControls = false }: Prediction
         }
 
         const predictionsPayload = (await predictionsResponse.json()) as { predictions: PredictionResponse[] };
-        const predictionPayloads = limit === null
-          ? predictionsPayload.predictions
-          : predictionsPayload.predictions.slice(0, limit);
+        const predictionRows = predictionsPayload.predictions.map(toPredictionRow);
+        const sortedRows = selectRows(predictionRows, scope, limit);
 
         if (!cancelled) {
-          setRows(predictionPayloads.map(toPredictionRow));
+          setRows(sortedRows);
         }
       } catch (caught) {
         if (!cancelled) {
@@ -55,7 +55,7 @@ export function PredictionBoard({ limit = 12, showControls = false }: Prediction
     return () => {
       cancelled = true;
     };
-  }, [limit]);
+  }, [limit, scope]);
 
   const stageOptions = useMemo(
     () => ["all", ...Array.from(new Set(rows.map((row) => row.stage))).filter(Boolean)],
@@ -133,8 +133,10 @@ function toPredictionRow(prediction: PredictionResponse): PredictionRow {
   return {
     id: match.id,
     date: formatKickoff(match.date),
+    kickoffTime: new Date(match.date).getTime(),
     stage: match.group_name ?? match.stage,
     match: `${match.home_team.name} vs ${match.away_team.name}`,
+    venue: match.venue,
     actualScore: prediction.recommended_tip.actual_score,
     status: match.status,
     model,
@@ -155,4 +157,24 @@ function toPredictionRow(prediction: PredictionResponse): PredictionRow {
     explanation: prediction.model_context.explanation,
     disagreement: 0
   };
+}
+
+function selectRows(rows: PredictionRow[], scope: "all" | "upcoming", limit: number | null) {
+  const sorted = [...rows].sort((left, right) => left.kickoffTime - right.kickoffTime);
+  const scoped = scope === "upcoming" ? upcomingRows(sorted, limit) : sorted;
+  return limit === null ? scoped : scoped.slice(0, limit);
+}
+
+function upcomingRows(rows: PredictionRow[], limit: number | null) {
+  const now = Date.now();
+  const activeOrFuture = rows.filter((row) => row.status !== "finished" && row.kickoffTime >= now - 2 * 60 * 60 * 1000);
+  if (activeOrFuture.length > 0) {
+    return activeOrFuture;
+  }
+  const unfinished = rows.filter((row) => row.status !== "finished");
+  if (unfinished.length > 0) {
+    return unfinished;
+  }
+  const recentFinished = [...rows].sort((left, right) => right.kickoffTime - left.kickoffTime);
+  return limit === null ? recentFinished : recentFinished.slice(0, limit);
 }

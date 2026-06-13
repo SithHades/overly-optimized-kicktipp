@@ -1,8 +1,10 @@
 export type PredictionRow = {
   id: number;
   date: string;
+  kickoffTime: number;
   stage: string;
   match: string;
+  venue?: string | null;
   actualScore?: string | null;
   status?: string;
   model: [number, number, number];
@@ -28,6 +30,7 @@ export const predictionRows: PredictionRow[] = [
   {
     id: 1,
     date: "2026-06-11 21:00",
+    kickoffTime: new Date("2026-06-11T21:00:00Z").getTime(),
     stage: "Group A",
     match: "Germany vs Japan",
     model: [0.48, 0.27, 0.25],
@@ -40,6 +43,7 @@ export const predictionRows: PredictionRow[] = [
   {
     id: 2,
     date: "2026-06-12 18:00",
+    kickoffTime: new Date("2026-06-12T18:00:00Z").getTime(),
     stage: "Group B",
     match: "Brazil vs Denmark",
     model: [0.57, 0.24, 0.19],
@@ -52,6 +56,7 @@ export const predictionRows: PredictionRow[] = [
   {
     id: 3,
     date: "2026-06-12 23:00",
+    kickoffTime: new Date("2026-06-12T23:00:00Z").getTime(),
     stage: "Group C",
     match: "Uruguay vs Mexico",
     model: [0.41, 0.29, 0.3],
