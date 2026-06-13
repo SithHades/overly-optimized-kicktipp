@@ -4,49 +4,7 @@ import { useEffect, useMemo, useState } from "react";
 
 import { MatchTable } from "@/components/match-table";
 import type { PredictionRow } from "@/lib/mock-data";
-
-type ApiMatch = {
-  id: number;
-  source: string | null;
-  source_match_id: string | null;
-  date: string;
-  stage: string;
-  group_name: string | null;
-  home_team: { id: number | null; name: string };
-  away_team: { id: number | null; name: string };
-  venue: string | null;
-  status: string;
-  home_score: number | null;
-  away_score: number | null;
-};
-
-type PredictionResponse = {
-  match: ApiMatch;
-  p_home_win: number;
-  p_draw: number;
-  p_away_win: number;
-  lambda_home: number;
-  lambda_away: number;
-  most_likely_scores: { score: string; p: number }[];
-  recommended_tip: {
-    score: string;
-    expected_points: number;
-    explanation: string;
-    actual_points: number | null;
-    actual_score: string | null;
-  };
-  home_rating: { model_elo: number; strength_score: number; tier: string; known_rating: boolean };
-  away_rating: { model_elo: number; strength_score: number; tier: string; known_rating: boolean };
-  rating_delta: number;
-  confidence: { label: "Low" | "Medium" | "High"; score: number; reason: string };
-  model_context: {
-    model_version: string;
-    data_source: string;
-    training_status: string;
-    rating_source: string;
-    explanation: string[];
-  };
-};
+import { apiBaseUrl, formatKickoff, type PredictionResponse } from "@/lib/predictions";
 
 type PredictionBoardProps = {
   limit?: number | null;
@@ -174,7 +132,7 @@ function toPredictionRow(prediction: PredictionResponse): PredictionRow {
 
   return {
     id: match.id,
-    date: new Date(match.date).toLocaleString(),
+    date: formatKickoff(match.date),
     stage: match.group_name ?? match.stage,
     match: `${match.home_team.name} vs ${match.away_team.name}`,
     actualScore: prediction.recommended_tip.actual_score,
@@ -197,8 +155,4 @@ function toPredictionRow(prediction: PredictionResponse): PredictionRow {
     explanation: prediction.model_context.explanation,
     disagreement: 0
   };
-}
-
-function apiBaseUrl() {
-  return (process.env.NEXT_PUBLIC_API_BASE_URL ?? "").replace(/\/$/, "");
 }

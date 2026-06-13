@@ -42,6 +42,15 @@ class RecommendedTip(BaseModel):
     actual_score: str | None = None
 
 
+class TipCandidate(BaseModel):
+    score: str
+    expected_points: float
+    exact_probability: float
+    label: str
+    rationale: str
+    actual_points: int | None = None
+
+
 class TeamRating(BaseModel):
     team: str
     model_elo: int
@@ -83,6 +92,7 @@ class PredictionResponse(BaseModel):
     lambda_away: float
     most_likely_scores: list[ScoreProbability]
     recommended_tip: RecommendedTip
+    tip_candidates: list[TipCandidate]
     home_rating: TeamRating
     away_rating: TeamRating
     rating_delta: int

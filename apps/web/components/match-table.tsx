@@ -1,3 +1,6 @@
+import Link from "next/link";
+import { ArrowUpRight } from "lucide-react";
+
 import { Badge } from "@/components/ui/badge";
 import { ProbabilityStrip } from "@/components/probability-strip";
 import type { PredictionRow } from "@/lib/mock-data";
@@ -57,7 +60,13 @@ export function MatchTable({ rows }: { rows: PredictionRow[] }) {
                   {row.date}
                 </td>
                 <td className="border-b border-terminal-line px-3 py-3">
-                  <div className="font-medium text-terminal-ink">{row.match}</div>
+                  <Link
+                    href={`/matches/${row.id}`}
+                    className="inline-flex items-center gap-2 font-medium text-terminal-ink hover:text-terminal-cyan"
+                  >
+                    {row.match}
+                    <ArrowUpRight className="h-3.5 w-3.5" />
+                  </Link>
                   <div className="font-mono text-xs text-terminal-muted">{row.stage}</div>
                 </td>
                 <td className="border-b border-terminal-line px-3 py-3">

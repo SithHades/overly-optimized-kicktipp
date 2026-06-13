@@ -6,6 +6,7 @@ from worldcup_api.schemas.predictions import (
     ScoreProbability,
     ScoringRulesSchema,
     TeamRating,
+    TipCandidate,
 )
 from worldcup_api.services.fixtures import PredictionFixture, find_prediction_fixture, load_prediction_fixtures, to_match_summary
 from worldcup_api.services.team_strength import (
@@ -18,7 +19,7 @@ from worldcup_api.services.team_strength import (
     strength_score,
 )
 from worldcup_model.models.poisson import outcome_probabilities, score_distribution, top_scores
-from worldcup_model.models.tippspiel import ScoringRules, expected_tippspiel_points, score_points
+from worldcup_model.models.tippspiel import ScoringRules, expected_points_for_pick, expected_tippspiel_points, score_points
 
 
 def build_prediction(
@@ -54,6 +55,7 @@ def build_prediction_for_fixture(
     best_tip = expected_tippspiel_points(distribution, rules, max_pick_goals=5)
     actual_score = _actual_score(fixture)
     actual_points = score_points(best_tip.pick, actual_score, rules) if actual_score else None
+    likely_scores = top_scores(distribution, limit=5)
     confidence = _prediction_confidence(outcomes.home_win, outcomes.draw, outcomes.away_win)
     home_rating = _team_rating(fixture.home_team, fixture.home_elo)
     away_rating = _team_rating(fixture.away_team, fixture.away_elo)
@@ -67,7 +69,7 @@ def build_prediction_for_fixture(
         lambda_away=fixture.lambda_away,
         most_likely_scores=[
             ScoreProbability(score=f"{home}-{away}", p=probability)
-            for (home, away), probability in top_scores(distribution, limit=5)
+            for (home, away), probability in likely_scores
         ],
         recommended_tip=RecommendedTip(
             score=f"{best_tip.pick[0]}-{best_tip.pick[1]}",
@@ -78,6 +80,13 @@ def build_prediction_for_fixture(
                 "Optimized for expected scoring-rule points across the full score distribution, "
                 "not just the single most likely scoreline."
             ),
+        ),
+        tip_candidates=_tip_candidates(
+            distribution=distribution,
+            rules=rules,
+            likely_scores=likely_scores,
+            best_pick=best_tip.pick,
+            actual_score=actual_score,
         ),
         home_rating=home_rating,
         away_rating=away_rating,
@@ -124,6 +133,59 @@ def _actual_score(fixture: PredictionFixture) -> tuple[int, int] | None:
     if fixture.home_score is None or fixture.away_score is None:
         return None
     return fixture.home_score, fixture.away_score
+
+
+def _tip_candidates(
+    *,
+    distribution: dict[tuple[int, int], float],
+    rules: ScoringRules,
+    likely_scores: list[tuple[tuple[int, int], float]],
+    best_pick: tuple[int, int],
+    actual_score: tuple[int, int] | None,
+) -> list[TipCandidate]:
+    candidates: dict[tuple[int, int], tuple[str, str]] = {
+        best_pick: (
+            "Best EV",
+            "Highest expected Tipp-Spiel points across the full score distribution.",
+        )
+    }
+    if likely_scores:
+        modal_pick = likely_scores[0][0]
+        candidates.setdefault(
+            modal_pick,
+            (
+                "Most likely exact",
+                "Single exact score with the highest model probability.",
+            ),
+        )
+    for index, (score, _) in enumerate(likely_scores[:5], start=1):
+        candidates.setdefault(
+            score,
+            (
+                f"Likely score #{index}",
+                "Included because it is among the model's most probable exact scores.",
+            ),
+        )
+
+    ranked = sorted(
+        candidates.items(),
+        key=lambda item: (
+            expected_points_for_pick(item[0], distribution, rules),
+            distribution.get(item[0], 0.0),
+        ),
+        reverse=True,
+    )
+    return [
+        TipCandidate(
+            score=f"{pick[0]}-{pick[1]}",
+            expected_points=expected_points_for_pick(pick, distribution, rules),
+            exact_probability=distribution.get(pick, 0.0),
+            label=label,
+            rationale=rationale,
+            actual_points=score_points(pick, actual_score, rules) if actual_score else None,
+        )
+        for pick, (label, rationale) in ranked
+    ]
 
 
 def _prediction_confidence(home_win: float, draw: float, away_win: float) -> PredictionConfidence:

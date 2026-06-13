@@ -36,6 +36,9 @@ def test_prediction_endpoint_accepts_scoring_rules(monkeypatch) -> None:
     payload = response.json()
     assert payload["recommended_tip"]["score"]
     assert payload["recommended_tip"]["expected_points"] > 0
+    assert payload["tip_candidates"]
+    assert payload["tip_candidates"][0]["expected_points"] > 0
+    assert payload["tip_candidates"][0]["exact_probability"] >= 0
 
 
 def test_match_preview_endpoint_returns_ai_preview(monkeypatch) -> None:
@@ -127,3 +130,4 @@ def test_finished_prediction_includes_actual_tip_points() -> None:
     assert prediction.match.away_score == 0
     assert prediction.recommended_tip.actual_score == "1-0"
     assert prediction.recommended_tip.actual_points is not None
+    assert any(candidate.actual_points is not None for candidate in prediction.tip_candidates)
