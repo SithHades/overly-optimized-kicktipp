@@ -1,14 +1,27 @@
 import os
+from contextlib import asynccontextmanager
 
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
 from worldcup_api.routers import admin, health, predictions, tournament_tips
+from worldcup_api.services.scheduled_ingest import start_scheduled_ingest, stop_scheduled_ingest
+
+
+@asynccontextmanager
+async def lifespan(app: FastAPI):
+    ingest_task = start_scheduled_ingest()
+    try:
+        yield
+    finally:
+        await stop_scheduled_ingest(ingest_task)
+
 
 app = FastAPI(
     title="WorldCupQuant API",
     version="0.1.0",
     description="Football prediction and Tipp-Spiel optimization API.",
+    lifespan=lifespan,
 )
 
 app.add_middleware(

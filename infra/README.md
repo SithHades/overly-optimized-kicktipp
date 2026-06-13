@@ -33,6 +33,11 @@ curl -X POST "$API_URL/api/admin/ingest-fixtures" -H "X-Admin-Token: $INGEST_ADM
 
 You can also open `/admin/ingest` in the deployed web app, paste the same token, and run the ingest from the UI.
 The first successful ingest creates the `pre_tournament` Tipps if they do not exist yet, then writes the latest `current` Tipps on every later ingest.
+- The API also runs the same fixture ingest once per day by default when `DATABASE_URL` and the selected provider credentials are configured.
+  - `SCHEDULED_INGEST_ENABLED=true` enables it; set this to `false` to disable API-side scheduling.
+  - `SCHEDULED_INGEST_UTC_HOUR=6` and `SCHEDULED_INGEST_UTC_MINUTE=0` control the daily run time.
+  - `SCHEDULED_INGEST_ON_STARTUP=false` avoids a write-heavy ingest on every deploy; set it to `true` only if you want an immediate run after container start.
+  - `SCHEDULED_INGEST_PROVIDER` can override `LIVE_FIXTURE_PROVIDER` for scheduled runs.
 
 - Add Caddy or Traefik routing once domains are assigned.
 - Add Windmill as a sibling stack or use an existing Windmill instance with job scripts from `ml/worldcup_model/jobs`.
