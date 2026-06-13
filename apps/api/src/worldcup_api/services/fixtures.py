@@ -24,6 +24,8 @@ class PredictionFixture:
     away_team: str
     venue: str | None
     status: str
+    home_score: int | None
+    away_score: int | None
     home_elo: float | None
     away_elo: float | None
     lambda_home: float
@@ -51,6 +53,8 @@ def load_prediction_fixtures() -> list[PredictionFixture]:
             away_team=fixture.away_team,
             venue=None,
             status="scheduled",
+            home_score=None,
+            away_score=None,
             home_elo=None,
             away_elo=None,
             lambda_home=fixture.lambda_home,
@@ -76,6 +80,8 @@ def to_match_summary(fixture: PredictionFixture) -> MatchSummary:
         away_team=TeamSide(name=fixture.away_team),
         venue=fixture.venue,
         status=fixture.status,
+        home_score=fixture.home_score,
+        away_score=fixture.away_score,
     )
 
 
@@ -100,6 +106,8 @@ def _load_live_fixtures() -> list[PredictionFixture]:
                 away_team=fixture.away_team,
                 venue=fixture.venue,
                 status=fixture.status.value,
+                home_score=fixture.home_score,
+                away_score=fixture.away_score,
                 home_elo=None,
                 away_elo=None,
                 lambda_home=lambda_home,
@@ -132,6 +140,8 @@ def _load_database_fixtures() -> list[PredictionFixture]:
                       home_team.current_elo AS home_elo,
                       away_team.current_elo AS away_elo,
                       m.venue,
+                      m.home_score,
+                      m.away_score,
                       m.status
                     FROM matches m
                     JOIN teams home_team ON home_team.id = m.home_team_id
@@ -158,6 +168,8 @@ def _load_database_fixtures() -> list[PredictionFixture]:
                         away_team=row["away_team"],
                         venue=row["venue"],
                         status=row["status"] or "scheduled",
+                        home_score=row["home_score"],
+                        away_score=row["away_score"],
                         home_elo=home_elo,
                         away_elo=away_elo,
                         lambda_home=lambda_home,

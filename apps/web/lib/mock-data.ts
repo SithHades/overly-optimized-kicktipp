@@ -3,9 +3,12 @@ export type PredictionRow = {
   date: string;
   stage: string;
   match: string;
+  actualScore?: string | null;
+  status?: string;
   model: [number, number, number];
   market: [number, number, number];
   bestTip: string;
+  actualPoints?: number | null;
   mostLikelyScore: string;
   confidence: "Low" | "Medium" | "High";
   confidenceScore?: number;

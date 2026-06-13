@@ -16,6 +16,8 @@ type ApiMatch = {
   away_team: { id: number | null; name: string };
   venue: string | null;
   status: string;
+  home_score: number | null;
+  away_score: number | null;
 };
 
 type PredictionResponse = {
@@ -26,7 +28,13 @@ type PredictionResponse = {
   lambda_home: number;
   lambda_away: number;
   most_likely_scores: { score: string; p: number }[];
-  recommended_tip: { score: string; expected_points: number; explanation: string };
+  recommended_tip: {
+    score: string;
+    expected_points: number;
+    explanation: string;
+    actual_points: number | null;
+    actual_score: string | null;
+  };
   home_rating: { model_elo: number; strength_score: number; tier: string; known_rating: boolean };
   away_rating: { model_elo: number; strength_score: number; tier: string; known_rating: boolean };
   rating_delta: number;
@@ -169,9 +177,12 @@ function toPredictionRow(prediction: PredictionResponse): PredictionRow {
     date: new Date(match.date).toLocaleString(),
     stage: match.group_name ?? match.stage,
     match: `${match.home_team.name} vs ${match.away_team.name}`,
+    actualScore: prediction.recommended_tip.actual_score,
+    status: match.status,
     model,
     market: model,
     bestTip: `${prediction.recommended_tip.score} (${prediction.recommended_tip.expected_points.toFixed(2)} EV)`,
+    actualPoints: prediction.recommended_tip.actual_points,
     mostLikelyScore: prediction.most_likely_scores[0]?.score ?? "-",
     confidence: prediction.confidence.label,
     confidenceScore: prediction.confidence.score,

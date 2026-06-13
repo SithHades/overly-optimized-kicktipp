@@ -36,8 +36,8 @@ export function LiveFixtureTable() {
             away_team: match.away_team.name,
             venue: match.venue,
             status: match.status,
-            home_score: null,
-            away_score: null
+            home_score: match.home_score,
+            away_score: match.away_score
           }))
         );
         setExportedAt(null);
@@ -102,7 +102,11 @@ export function LiveFixtureTable() {
                   <div className="font-medium text-terminal-ink">
                     {fixture.home_team} vs {fixture.away_team}
                   </div>
-                  <div className="font-mono text-xs text-terminal-muted">{fixture.source}</div>
+                  <div className="font-mono text-xs text-terminal-muted">
+                    {fixture.status === "finished" && fixture.home_score !== null && fixture.away_score !== null
+                      ? `FT ${fixture.home_score}-${fixture.away_score}`
+                      : fixture.source}
+                  </div>
                 </td>
                 <td className="border-b border-terminal-line px-3 py-3 text-terminal-muted">
                   {fixture.group_name ?? fixture.stage}

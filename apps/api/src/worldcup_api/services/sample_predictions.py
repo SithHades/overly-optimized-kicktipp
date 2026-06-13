@@ -18,7 +18,7 @@ from worldcup_api.services.team_strength import (
     strength_score,
 )
 from worldcup_model.models.poisson import outcome_probabilities, score_distribution, top_scores
-from worldcup_model.models.tippspiel import ScoringRules, expected_tippspiel_points
+from worldcup_model.models.tippspiel import ScoringRules, expected_tippspiel_points, score_points
 
 
 def build_prediction(
@@ -52,6 +52,8 @@ def build_prediction_for_fixture(
         exact_score=scoring_rules.exact_score,
     )
     best_tip = expected_tippspiel_points(distribution, rules, max_pick_goals=5)
+    actual_score = _actual_score(fixture)
+    actual_points = score_points(best_tip.pick, actual_score, rules) if actual_score else None
     confidence = _prediction_confidence(outcomes.home_win, outcomes.draw, outcomes.away_win)
     home_rating = _team_rating(fixture.home_team, fixture.home_elo)
     away_rating = _team_rating(fixture.away_team, fixture.away_elo)
@@ -70,6 +72,8 @@ def build_prediction_for_fixture(
         recommended_tip=RecommendedTip(
             score=f"{best_tip.pick[0]}-{best_tip.pick[1]}",
             expected_points=best_tip.expected_points,
+            actual_points=actual_points,
+            actual_score=f"{actual_score[0]}-{actual_score[1]}" if actual_score else None,
             explanation=(
                 "Optimized for expected scoring-rule points across the full score distribution, "
                 "not just the single most likely scoreline."
@@ -112,6 +116,14 @@ def _team_rating(team: str, rating: float | None) -> TeamRating:
         tier=rating_tier(team, rating),
         known_rating=rating_known(rating),
     )
+
+
+def _actual_score(fixture: PredictionFixture) -> tuple[int, int] | None:
+    if fixture.status != "finished":
+        return None
+    if fixture.home_score is None or fixture.away_score is None:
+        return None
+    return fixture.home_score, fixture.away_score
 
 
 def _prediction_confidence(home_win: float, draw: float, away_win: float) -> PredictionConfidence:

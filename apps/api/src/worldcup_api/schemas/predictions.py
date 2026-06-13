@@ -25,6 +25,8 @@ class MatchSummary(BaseModel):
     away_team: TeamSide
     venue: str | None = None
     status: str = "scheduled"
+    home_score: int | None = None
+    away_score: int | None = None
 
 
 class ScoreProbability(BaseModel):
@@ -36,6 +38,8 @@ class RecommendedTip(BaseModel):
     score: str
     expected_points: float
     explanation: str
+    actual_points: int | None = None
+    actual_score: str | None = None
 
 
 class TeamRating(BaseModel):

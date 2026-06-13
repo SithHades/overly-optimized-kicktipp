@@ -98,11 +98,12 @@ class FootballDataWorldCupProvider(LiveFixtureProvider):
         response.raise_for_status()
         payload = response.json()
         fixtures = [self._fixture_from_match(item) for item in payload.get("matches", [])]
+        fixtures, warnings = _enrich_from_openfootball(fixtures, timeout_seconds=self.timeout_seconds)
         return LiveIngestResult(
             provider=self.name,
             fetched_at=datetime.now(UTC),
             fixtures=fixtures,
-            warnings=[],
+            warnings=warnings,
         )
 
     def _fixture_from_match(self, item: dict) -> LiveFixture:
@@ -141,3 +142,68 @@ def _football_data_status(value: str | None) -> FixtureStatus:
             return FixtureStatus.postponed
         case _:
             return FixtureStatus.unknown
+
+
+def _enrich_from_openfootball(
+    fixtures: list[LiveFixture],
+    timeout_seconds: float,
+) -> tuple[list[LiveFixture], list[str]]:
+    try:
+        reference = OpenFootballWorldCupProvider(timeout_seconds=timeout_seconds).fetch().fixtures
+    except Exception as exc:
+        return fixtures, [f"OpenFootball venue enrichment failed: {exc}"]
+
+    reference_by_key = {_fixture_match_key(fixture): fixture for fixture in reference}
+    enriched: list[LiveFixture] = []
+    enriched_count = 0
+    for fixture in fixtures:
+        reference_fixture = reference_by_key.get(_fixture_match_key(fixture))
+        if reference_fixture is None:
+            enriched.append(fixture)
+            continue
+
+        updated = fixture.model_copy(
+            update={
+                "venue": fixture.venue or reference_fixture.venue,
+                "city": fixture.city or reference_fixture.city,
+                "country": fixture.country or reference_fixture.country,
+                "home_score": fixture.home_score if fixture.home_score is not None else reference_fixture.home_score,
+                "away_score": fixture.away_score if fixture.away_score is not None else reference_fixture.away_score,
+                "raw": {
+                    **fixture.raw,
+                    "openfootball_reference": reference_fixture.raw,
+                },
+            }
+        )
+        if updated.venue != fixture.venue or updated.home_score != fixture.home_score or updated.away_score != fixture.away_score:
+            enriched_count += 1
+        enriched.append(updated)
+
+    warnings = []
+    if enriched_count:
+        warnings.append(f"Enriched {enriched_count} fixtures with OpenFootball venue/score data.")
+    return enriched, warnings
+
+
+def _fixture_match_key(fixture: LiveFixture) -> tuple[str, str, str]:
+    return (
+        fixture.date.date().isoformat(),
+        _normalize_team_key(fixture.home_team),
+        _normalize_team_key(fixture.away_team),
+    )
+
+
+def _normalize_team_key(team: str) -> str:
+    aliases = {
+        "bosnia & herzegovina": "bosnia-herzegovina",
+        "bosnia and herzegovina": "bosnia-herzegovina",
+        "czech republic": "czechia",
+        "côte d'ivoire": "ivory coast",
+        "cote d'ivoire": "ivory coast",
+        "united states of america": "united states",
+        "usa": "united states",
+        "cape verde": "cape verde islands",
+        "curacao": "curaçao",
+    }
+    normalized = team.strip().casefold()
+    return aliases.get(normalized, normalized)

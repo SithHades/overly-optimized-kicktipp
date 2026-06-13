@@ -2,6 +2,9 @@ from fastapi.testclient import TestClient
 from pydantic import BaseModel, Field
 
 from worldcup_api.main import app
+from worldcup_api.schemas.predictions import ScoringRulesSchema
+from worldcup_api.services.fixtures import PredictionFixture
+from worldcup_api.services.sample_predictions import build_prediction_for_fixture
 
 
 def test_prediction_list_includes_model_context(monkeypatch) -> None:
@@ -93,3 +96,34 @@ def test_match_preview_endpoint_uses_cached_preview(monkeypatch) -> None:
 
     assert response.status_code == 200
     assert response.json()["fixture"] == "Cached fixture"
+
+
+def test_finished_prediction_includes_actual_tip_points() -> None:
+    from datetime import UTC, datetime
+
+    prediction = build_prediction_for_fixture(
+        PredictionFixture(
+            id=1,
+            source="test",
+            source_match_id="test-1",
+            date=datetime(2026, 6, 11, 19, 0, tzinfo=UTC),
+            stage="GROUP_STAGE",
+            group_name="GROUP_A",
+            home_team="Mexico",
+            away_team="South Africa",
+            venue="Mexico City",
+            status="finished",
+            home_score=1,
+            away_score=0,
+            home_elo=1800,
+            away_elo=1600,
+            lambda_home=1.6,
+            lambda_away=0.8,
+        ),
+        ScoringRulesSchema(),
+    )
+
+    assert prediction.match.home_score == 1
+    assert prediction.match.away_score == 0
+    assert prediction.recommended_tip.actual_score == "1-0"
+    assert prediction.recommended_tip.actual_points is not None

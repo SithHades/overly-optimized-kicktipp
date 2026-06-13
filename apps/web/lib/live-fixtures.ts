@@ -30,5 +30,7 @@ export type ApiMatchListResponse = {
     away_team: { id: number | null; name: string };
     venue: string | null;
     status: string;
+    home_score: number | null;
+    away_score: number | null;
   }[];
 };
